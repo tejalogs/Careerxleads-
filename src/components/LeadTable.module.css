@@ -1,0 +1,292 @@
+.tableContainer {
+  background: var(--bg-glass);
+  backdrop-filter: blur(16px);
+  border: 1px solid var(--border-color);
+  border-radius: var(--border-radius);
+  box-shadow: var(--shadow-lg);
+  overflow: hidden;
+  animation: fadeIn 0.4s ease-out forwards;
+}
+
+.tableHeader {
+  padding: 1.5rem;
+  border-bottom: 1px solid var(--border-color);
+  background: rgba(30, 41, 59, 0.4);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+
+.tableTitle {
+  font-size: 1.25rem;
+  color: var(--text-primary);
+  margin-bottom: 0.25rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.actions {
+  display: flex;
+  gap: 0.75rem;
+}
+
+.actionBtn {
+  gap: 0.5rem;
+  font-size: 0.875rem;
+  padding: 0.5rem 1rem;
+}
+
+.filtersPanel {
+  padding: 1.25rem 1.5rem;
+  border-bottom: 1px solid var(--border-color);
+  background: rgba(15, 23, 42, 0.2);
+}
+
+.filterTitle {
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+  margin-bottom: 1rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.filtersWrapper {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 1rem;
+}
+
+.tableWrapper {
+  overflow-x: auto;
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+}
+
+.table th {
+  padding: 1rem 1.5rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  border-bottom: 1px solid var(--border-color);
+  background: rgba(30, 41, 59, 0.2);
+  white-space: nowrap;
+}
+
+.table td {
+  padding: 1.25rem 1.5rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  vertical-align: top;
+}
+
+.tableRow {
+  transition: background-color 0.2s;
+}
+
+.tableRow:hover {
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.candidateInfo {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  min-width: 200px;
+}
+
+.candidateName {
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.candidateHeadline {
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  line-height: 1.4;
+}
+
+.educationInfo {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  min-width: 250px;
+}
+
+.university {
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+.fieldItem {
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+}
+
+.yearBadge {
+  display: inline-block;
+  padding: 2px 8px;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  width: max-content;
+  margin-top: 0.25rem;
+}
+
+.scoreBadge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  font-weight: 700;
+  font-size: 1rem;
+}
+
+.scoreHigh {
+  background: rgba(16, 185, 129, 0.15);
+  color: var(--accent-success);
+  border: 1px solid rgba(16, 185, 129, 0.3);
+  box-shadow: 0 0 10px rgba(16, 185, 129, 0.2);
+}
+
+.scoreMedium {
+  background: rgba(245, 158, 11, 0.15);
+  color: var(--accent-warning);
+  border: 1px solid rgba(245, 158, 11, 0.3);
+}
+
+.approvedBadge {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 4px 8px;
+  background: rgba(16, 185, 129, 0.1);
+  color: #10b981;
+  border-radius: 4px;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.reviewBadge {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 4px 8px;
+  background: rgba(245, 158, 11, 0.1);
+  color: #f59e0b;
+  border-radius: 4px;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.guardrailList {
+  display: flex;
+  gap: 0.5rem;
+  font-size: 1.1rem;
+}
+
+.feedbackLoop {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.feedBtn {
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  background: var(--bg-tertiary);
+  color: var(--text-secondary);
+  border: 1px solid var(--border-color);
+  transition: all 0.2s;
+}
+
+.feedBtn:hover {
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+}
+
+.feedActive {
+  background: rgba(16, 185, 129, 0.2);
+  color: #10b981;
+  border-color: #10b981;
+}
+
+.feedActiveIrrelevant {
+  background: rgba(239, 68, 68, 0.2);
+  color: #ef4444;
+  border-color: #ef4444;
+}
+
+.feedActiveConverted {
+  background: rgba(139, 92, 246, 0.2);
+  color: #8b5cf6;
+  border-color: #8b5cf6;
+}
+
+.mr-2 {
+  margin-right: 0.5rem;
+}
+
+.messageColumn {
+  min-width: 300px;
+  max-width: 400px;
+}
+
+.messageCard {
+  background: rgba(15, 23, 42, 0.5);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  padding: 1rem;
+  font-size: 0.875rem;
+  color: var(--text-primary);
+  line-height: 1.5;
+  white-space: pre-wrap;
+  position: relative;
+}
+
+.messageCard::before {
+  content: '"';
+  position: absolute;
+  top: 0.5rem;
+  left: 0.5rem;
+  font-size: 2rem;
+  color: rgba(255, 255, 255, 0.05);
+  font-family: serif;
+  line-height: 1;
+}
+
+.emptyState {
+  text-align: center;
+  padding: 4rem !important;
+  color: var(--text-secondary);
+  font-style: italic;
+}
+
+@media (max-width: 1024px) {
+  .actions {
+    width: 100%;
+  }
+  
+  .actionBtn {
+    flex: 1;
+    justify-content: center;
+  }
+}

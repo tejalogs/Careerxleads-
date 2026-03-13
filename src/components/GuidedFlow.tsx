@@ -1,0 +1,330 @@
+import React, { useState } from 'react';
+import styles from './GuidedFlow.module.css';
+import { FiSend, FiArrowRight, FiCommand, FiUser, FiCheckCircle, FiDollarSign, FiInfo } from 'react-icons/fi';
+import { GenerationParams } from '@/types';
+
+interface Message {
+  id: string;
+  sender: 'ai' | 'user';
+  text: string;
+}
+
+interface Question {
+  key: keyof GenerationParams;
+  text: string;
+  examples: string[];
+  options?: string[];
+}
+
+const questions: Question[] = [
+  {
+    key: 'audience',
+    text: 'Who are you trying to reach?',
+    examples: ['Students looking for internships', 'Students looking for jobs', 'Recent graduates', 'Early career professionals', 'Career switchers']
+  },
+  {
+    key: 'originCountry',
+    text: 'Which country are these candidates originally from?',
+    examples: ['India', 'China', 'Nigeria']
+  },
+  {
+    key: 'currentLocation',
+    text: 'Where are these candidates currently studying or working?',
+    examples: ['United States', 'Ireland', 'Canada', 'United Kingdom', 'Australia']
+  },
+  {
+    key: 'stage',
+    text: 'What stage are these candidates in?',
+    examples: [],
+    options: ['Undergraduate students', 'Master\'s students', 'Recent graduates', 'Early professionals']
+  },
+  {
+    key: 'fields',
+    text: 'Which fields should we focus on?',
+    examples: ['Computer Science', 'Data Science', 'Business Analytics', 'Engineering', 'MBA']
+  },
+  {
+    key: 'opportunityTypes',
+    text: 'What type of opportunities are they likely looking for?',
+    examples: [],
+    options: ['Internships', 'Full-time jobs', 'Both']
+  },
+  {
+    key: 'leadCount',
+    text: 'How many leads should we generate?',
+    examples: ['100', '500', '1000']
+  }
+];
+
+interface GuidedFlowProps {
+  onComplete: (params: GenerationParams) => void;
+}
+
+export default function GuidedFlow({ onComplete }: GuidedFlowProps) {
+  const [currentStep, setCurrentStep] = useState(0);
+  const [messages, setMessages] = useState<Message[]>([
+    { id: '1', sender: 'ai', text: questions[0].text }
+  ]);
+  const [inputValue, setInputValue] = useState('');
+  const [answers, setAnswers] = useState<Partial<GenerationParams>>({});
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [aiBudget, setAiBudget] = useState<{ total: number; apify: number; ai: number; complexity: string } | null>(null);
+  const [isEstimating, setIsEstimating] = useState(false);
+
+  const currentQuestion = questions[currentStep];
+
+  const handleSend = (text: string) => {
+    if (!text.trim() && !currentQuestion?.options?.includes(text)) return;
+    
+    // Add user message
+    const newMessages = [
+      ...messages,
+      { id: Date.now().toString(), sender: 'user' as const, text }
+    ];
+    
+    setMessages(newMessages);
+    setInputValue('');
+
+    const newAnswers = { ...answers, [currentQuestion.key]: text };
+    setAnswers(newAnswers);
+
+    if (currentStep < questions.length - 1) {
+      // Simulate slight delay for AI typing feel
+      setTimeout(() => {
+        setMessages(prev => [
+          ...prev,
+          { id: (Date.now() + 1).toString(), sender: 'ai', text: questions[currentStep + 1].text }
+        ]);
+        setCurrentStep(currentStep + 1);
+      }, 500);
+    } else {
+      // Flow complete - Start AI Estimation
+      setIsEstimating(true);
+      setMessages(prev => [
+        ...prev,
+        { id: (Date.now() + 1).toString(), sender: 'ai', text: "Analyzing your requirements to estimate the discovery budget and server resources..." }
+      ]);
+
+      // Call AI Estimation API
+      fetch('/api/estimate-budget', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ params: newAnswers })
+      })
+      .then(res => res.json())
+      .then(estimate => {
+        setAiBudget(estimate);
+        setIsEstimating(false);
+        
+        setTimeout(() => {
+          setMessages(prev => [
+            ...prev,
+            { id: (Date.now() + 2).toString(), sender: 'ai', text: `Based on your target audience, this is a ${estimate.complexity}-complexity discovery. I've calculated the budget in the sidebar. Ready to initiate the discovery strategy?` }
+          ]);
+        }, 1000);
+      })
+      .catch(err => {
+        console.error('Estimation failed:', err);
+        setIsEstimating(false);
+      });
+    }
+  };
+
+  const handleBeginDiscovery = () => {
+    setIsGenerating(true);
+    setTimeout(() => {
+      onComplete(answers as GenerationParams);
+    }, 800);
+  };
+
+  const getLeadCount = () => {
+    const raw = answers.leadCount as string;
+    if (!raw) return 100;
+    const match = raw.match(/\d+/);
+    return match ? parseInt(match[0]) : 100;
+  };
+
+  const currentLeadGoal = getLeadCount();
+  const apifyCost = aiBudget?.apify ?? (currentLeadGoal * 0.005);
+  const aiCost = aiBudget?.ai ?? (currentLeadGoal * 0.002);
+  const totalCost = aiBudget?.total ?? (apifyCost + aiCost);
+
+  return (
+    <div className={styles.flowContainer}>
+      <div className={styles.chatArea}>
+        <div className={styles.chatHeader}>
+          <div className={styles.aiAvatar}>
+            <img src="/logo.png" alt="Branding" width={24} height={24} />
+          </div>
+          <div>
+            <h3>CareerX Agent</h3>
+            <p className="text-secondary text-sm">Online • Ready to discover leads</p>
+          </div>
+        </div>
+
+        <div className={styles.messageList}>
+          {messages.map((msg) => (
+            <div key={msg.id} className={`${styles.messageWrapper} ${msg.sender === 'user' ? styles.userWrapper : styles.aiWrapper}`}>
+              {msg.sender === 'ai' && (
+                <div className={styles.messageAvatarAi}>
+                  <img src="/logo.png" alt="Branding" width={16} height={16} />
+                </div>
+              )}
+              <div className={`${styles.message} ${msg.sender === 'user' ? styles.userMessage : styles.aiMessage}`}>
+                {msg.text}
+              </div>
+              {msg.sender === 'user' && (
+                <div className={styles.messageAvatarUser}>
+                  <FiUser size={14} />
+                </div>
+              )}
+            </div>
+          ))}
+          {isGenerating && (
+            <div className={`${styles.messageWrapper} ${styles.aiWrapper}`}>
+               <div className={styles.messageAvatarAi}>
+                  <img src="/logo.png" alt="Branding" width={16} height={16} />
+                </div>
+                <div className={`${styles.message} ${styles.aiMessage} ${styles.typingIndicator}`}>
+                  <span></span><span></span><span></span>
+                </div>
+            </div>
+          )}
+          
+          {aiBudget && !isGenerating && (
+            <div className={styles.confirmAction}>
+              <button className="btn btn-primary" onClick={handleBeginDiscovery}>
+                Initiate Discovery Agent <FiArrowRight className="ml-2" />
+              </button>
+            </div>
+          )}
+        </div>
+
+        {!isGenerating && currentQuestion && (
+          <div className={styles.inputArea}>
+            {currentQuestion.options ? (
+              <div className={styles.optionsGrid}>
+                {currentQuestion.options.map(opt => (
+                  <button 
+                    key={opt}
+                    className={styles.optionBtn}
+                    onClick={() => handleSend(opt)}
+                  >
+                    {opt}
+                  </button>
+                ))}
+              </div>
+            ) : (
+              <div className="flex-col gap-2">
+                {currentQuestion.examples && currentQuestion.examples.length > 0 && (
+                  <div className={styles.examples}>
+                    <span className="text-sm text-secondary">Examples: </span>
+                    <div className={styles.exampleChips}>
+                      {currentQuestion.examples.map(ex => (
+                        <button key={ex} className={styles.chip} onClick={() => setInputValue(ex)}>
+                          {ex}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                <div className={styles.inputForm}>
+                  <input
+                    type="text"
+                    value={inputValue}
+                    onChange={(e) => setInputValue(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') handleSend(inputValue);
+                    }}
+                    placeholder="Type your answer here..."
+                    className={styles.textInput}
+                    autoFocus
+                  />
+                  <button 
+                    className={styles.sendBtn}
+                    onClick={() => handleSend(inputValue)}
+                    disabled={!inputValue.trim()}
+                  >
+                    <FiSend />
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+      
+      <div className={styles.sidebar}>
+        <div className={styles.progressCard}>
+          <h3>Discovery Setup Context</h3>
+          <p className="text-sm text-secondary mb-4">I use this information to calculate the best platforms and search terms to discover your ideal candidates.</p>
+          
+          <ul className={styles.progressList}>
+            {questions.map((q, idx) => (
+              <li key={q.key} className={`${styles.progressItem} ${idx < currentStep ? styles.completed : idx === currentStep ? styles.active : ''}`}>
+                <div className={styles.stepIndicator}>
+                  {idx < currentStep ? <FiCheckCircle /> : <span>{idx + 1}</span>}
+                </div>
+                <div className={styles.stepContent}>
+                  <span className={styles.stepLabel}>{q.text}</span>
+                  {idx < currentStep && <span className={styles.stepAnswer}>{answers[q.key]}</span>}
+                </div>
+              </li>
+            ))}
+          </ul>
+        </div>
+
+        <div className={styles.costCard}>
+           <div className={styles.costHeader}>
+             <FiDollarSign size={18} color="var(--accent-primary)" />
+             <div className="flex-col">
+               <h3>Estimated Discovery Budget</h3>
+               <span className="text-xs text-secondary">
+                 {isEstimating ? 'AI Estimating...' : 
+                  aiBudget ? `${aiBudget.complexity} Complexity` : 
+                  'Awaiting specs...'}
+               </span>
+             </div>
+           </div>
+           
+           <div className={styles.meterContainer}>
+             <div className={styles.meterLabels}>
+               <span className="text-xs text-secondary">Total Est. Cost</span>
+               <span className={`font-semibold text-primary ${isEstimating ? 'animate-pulse' : ''}`} style={{ fontSize: '1.25rem' }}>
+                 {isEstimating ? '---' : `$${totalCost.toFixed(2)}`}
+               </span>
+             </div>
+             <div className={styles.meterTrack}>
+                <div 
+                  className={`${styles.meterFill} ${isEstimating ? styles.meterLoading : ''}`} 
+                  style={{ width: isEstimating ? '100%' : `${Math.min((currentLeadGoal / 1000) * 100, 100)}%` }}
+                ></div>
+             </div>
+           </div>
+
+           <div className={styles.costBreakdown}>
+             <div className={styles.breakdownItem}>
+                <div className={styles.breakdownDot} style={{ background: 'var(--accent-primary)' }}></div>
+                <div className="flex-between flex-1">
+                  <span>Apify Scraper</span>
+                  <span className="font-medium">${apifyCost.toFixed(2)}</span>
+                </div>
+             </div>
+             <div className={styles.breakdownItem}>
+                <div className={styles.breakdownDot} style={{ background: 'var(--accent-secondary)' }}></div>
+                <div className="flex-between flex-1">
+                  <span>AI Qualification</span>
+                  <span className="font-medium">${aiCost.toFixed(2)}</span>
+                </div>
+             </div>
+           </div>
+
+           <div className={styles.costInfo}>
+             <FiInfo size={14} className="mt-1" />
+             <p>Estimates include API credits and platform fees. Final cost scales with profile complexity.</p>
+           </div>
+        </div>
+      </div>
+    </div>
+  );
+}

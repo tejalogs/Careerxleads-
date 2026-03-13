@@ -11,7 +11,7 @@ const DEFAULT_STRATEGY = {
     'Master\'s student business analytics United States',
     'Indian MS Computer Science student USA'
   ],
-  apifyActors: ['apify/linkedin-search-scraper']
+  apifyActors: ['apify/linkedin-profile-search']
 };
 
 export async function POST(req: Request) {
@@ -26,7 +26,7 @@ export async function POST(req: Request) {
     try {
       // Use 'gemini-1.5-flash-latest' which is the common alias for the newest flash model
       const model = genAI.getGenerativeModel({ 
-        model: 'gemini-1.5-flash-latest', 
+        model: 'gemini-1.5-flash', 
         generationConfig: { responseMimeType: "application/json" }
       });
 

@@ -28,7 +28,7 @@ export async function POST(req: Request) {
     }
     
     // Normalize actor ID (replace / with ~ for API URL)
-    let actorId = process.env.APIFY_LINKEDIN_ACTOR_ID || 'apify/linkedin-search-scraper';
+    let actorId = process.env.APIFY_LINKEDIN_ACTOR_ID || 'apify/linkedin-profile-search';
     const normalizedActorId = actorId.replace('/', '~');
     
     console.log(`Starting Apify Actor (${normalizedActorId}) via fetch...`);

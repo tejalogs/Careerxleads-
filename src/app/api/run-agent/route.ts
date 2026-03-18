@@ -8,7 +8,7 @@ import { mockScore, qualifyProfiles } from '@/lib/leads/qualification';
 import { formatRejectionFeedback } from '@/lib/leads/rejection';
 import { buildAgentPrompt } from '@/lib/leads/queries';
 
-export const maxDuration = 1200; // 20 min — requires Vercel Pro/Enterprise plan
+export const maxDuration = 60; // Vercel Hobby max (300 on Pro)
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY || '' });
 const CLAUDE_MODEL = process.env.CLAUDE_MODEL || 'claude-haiku-4-5-20251001';

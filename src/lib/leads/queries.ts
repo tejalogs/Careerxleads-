@@ -44,45 +44,62 @@ export function buildQueryExamples(params: any, sequence: string[]): string {
   const fields   = params.fields || 'Computer Science';
   const field1   = fields.split(',')[0].trim();
   const field2   = (fields.split(',')[1] || '').trim();
-  const gradYr   = new Date().getFullYear() + 1;
-  const gradYr2  = gradYr + 1;
+
+  // Graduation year: prefer user-specified, fall back to computed next year
+  const rawGradYr = (params.graduationYear || '').match(/\d{4}/g);
+  const gradYr    = rawGradYr ? parseInt(rawGradYr[0]) : new Date().getFullYear() + 1;
+  const gradYr2   = rawGradYr && rawGradYr[1] ? parseInt(rawGradYr[1]) : gradYr + 1;
+  const gradYrStr = rawGradYr ? rawGradYr.join(' OR ') : String(gradYr);
+
   const isIntern = (params.opportunityTypes || '').toLowerCase().includes('intern');
   const intent   = isIntern ? 'seeking internship' : 'open to work';
   const intKw    = isIntern ? 'internship' : 'full-time';
 
+  // Derive visa keyword from destination country answer
+  const visaRaw  = (params.visaStatus || '').toLowerCase();
+  const visaKw   = visaRaw.includes('canada') ? 'PGWP'
+    : visaRaw.includes('uk') || visaRaw.includes('united kingdom') || visaRaw.includes('graduate visa') ? 'Graduate Visa'
+    : visaRaw.includes('ireland') || visaRaw.includes('australia') || visaRaw.includes('uae') || visaRaw.includes('europe') ? 'work permit'
+    : 'OPT'; // default: United States
+
+  // Target city hint for GitHub location queries
+  const cityHint = params.targetCities && !/all/i.test(params.targetCities)
+    ? params.targetCities.split(/[,\/]/).map((c: string) => c.trim().split(' ')[0]).filter(Boolean).join(' OR ')
+    : null;
+
   const exMap: Record<string, string[]> = {
     linkedin: [
-      // Tier-1: explicit OPT/F1 + intent
-      `MS "${field1}" OPT ${gradYr} ${intent} ${origin}`,
-      `"F1 visa" "${field1}" "seeking" ${gradYr} ${origin}`,
+      // Tier-1: explicit visa status + intent
+      `MS "${field1}" ${visaKw} ${gradYrStr} ${intent} ${origin}`,
+      `"F1 visa" "${field1}" "seeking" ${gradYrStr} ${origin}`,
       // Tier-2: degree + origin + year
-      `Master of Science "${field1}" ${origin} student ${gradYr}`,
-      `"${field1}" "${origin}" graduate student ${intKw} ${gradYr}`,
+      `Master of Science "${field1}" ${origin} student ${gradYrStr}`,
+      `"${field1}" "${origin}" graduate student ${intKw} ${gradYrStr}`,
       // Tier-3: B.Tech India → MS abroad pattern (100% origin accuracy)
-      `"B.Tech" "${field1}" MS ${gradYr} ${origin}`,
-      `"B.E." OR "B.Tech" India "${field1}" "MS" "seeking" OR "OPT"`,
+      `"B.Tech" "${field1}" MS ${gradYrStr} ${origin}`,
+      `"B.E." OR "B.Tech" India "${field1}" "MS" "seeking" OR "${visaKw}"`,
       // ISA/IGSA membership — community-embedded students
-      `"Indian Student Association" "${field1}" MS ${gradYr}`,
-      `"IGSA" OR "ISA" "${field1}" graduate ${gradYr} "seeking"`,
+      `"Indian Student Association" "${field1}" MS ${gradYrStr}`,
+      `"IGSA" OR "ISA" "${field1}" graduate ${gradYrStr} "seeking"`,
       // Time pressure: imminent graduation = urgency
-      `"Graduating May ${gradYr}" "${field1}" "${origin}" "seeking" OR "OPT"`,
+      `"Graduating May ${gradYr}" "${field1}" "${origin}" "seeking" OR "${visaKw}"`,
       `"Graduating Dec ${gradYr}" "${field1}" "${origin}" "internship" OR "full-time"`,
       `"Incoming Summer ${gradYr}" "${field1}" "${origin}" internship`,
       `"Class of ${gradYr}" "${field1}" "${origin}" "open to work" OR "seeking"`,
       // Skill gap: self-aware about gaps → perfect CareerX candidate
-      `"upskilling" "${field1}" MS "${origin}" ${gradYr}`,
+      `"upskilling" "${field1}" MS "${origin}" ${gradYrStr}`,
       `"self-taught" OR "bootcamp" "${field1}" MS "${origin}" "seeking"`,
       // Alternate grad year + field2
-      ...(field2 ? [`MS "${field2}" ${origin} ${gradYr} ${intent}`] : []),
-      `"${field1}" "${origin}" "CPT" OR "OPT" ${gradYr2} entry level`,
+      ...(field2 ? [`MS "${field2}" ${origin} ${gradYrStr} ${intent}`] : []),
+      `"${field1}" "${origin}" "CPT" OR "${visaKw}" ${gradYr2} entry level`,
       // Comment intent: person actively asked for referrals
-      `"interested" "refer me" "${field1}" MS ${origin} ${gradYr}`,
-      `"looking for referral" "${field1}" "${origin}" "OPT" OR "MS"`,
+      `"interested" "refer me" "${field1}" MS ${origin} ${gradYrStr}`,
+      `"looking for referral" "${field1}" "${origin}" "${visaKw}" OR "MS"`,
       // Financial clock: needs immediate joining
-      `"immediate joining" "${field1}" "${origin}" MS ${gradYr}`,
-      `"available immediately" "${field1}" "${origin}" "OPT" seeking`,
+      `"immediate joining" "${field1}" "${origin}" MS ${gradYrStr}`,
+      `"available immediately" "${field1}" "${origin}" "${visaKw}" seeking`,
       // Resume review help-seekers
-      `"resume review" "${field1}" "${origin}" MS ${gradYr} seeking`,
+      `"resume review" "${field1}" "${origin}" MS ${gradYrStr} seeking`,
       // LinkedIn Premium badge + still seeking = willing buyer
       `"LinkedIn Premium" "${field1}" "${origin}" MS "seeking" OR "open to work"`,
       // Day 1 CPT schools — 100% struggle signal
@@ -98,26 +115,26 @@ export function buildQueryExamples(params: any, sequence: string[]): string {
       `"AKTU" OR "Delhi University" OR "Amity" MS "${field1}" ${origin} OPT`,
     ],
     google: [
-      // OPT/visa struggle dorks
-      `site:linkedin.com/in/ "OPT" "${field1}" "${origin}" ${gradYr}`,
+      // Visa/status struggle dorks
+      `site:linkedin.com/in/ "${visaKw}" "${field1}" "${origin}" ${gradYrStr}`,
       `site:linkedin.com/in/ "F1" "MS" "${field1}" "${origin}" "seeking"`,
       `site:linkedin.com/in/ "STEM OPT" OR "STEM extension" "${field1}" "${origin}"`,
       `site:linkedin.com/in/ "H1B sponsorship" "MS" "${field1}" "${origin}"`,
       // B.Tech dorks — highly specific India origin signal
-      `site:linkedin.com/in/ "B.Tech" "${field1}" "MS" "${origin}" ${gradYr}`,
-      `site:linkedin.com/in/ "B.Tech" India "MS" "${field1}" "seeking" OR "OPT"`,
+      `site:linkedin.com/in/ "B.Tech" "${field1}" "MS" "${origin}" ${gradYrStr}`,
+      `site:linkedin.com/in/ "B.Tech" India "MS" "${field1}" "seeking" OR "${visaKw}"`,
       // Time pressure dorks
-      `site:linkedin.com/in/ "Graduating ${gradYr}" "${field1}" "${origin}" "OPT" OR "seeking"`,
+      `site:linkedin.com/in/ "Graduating ${gradYr}" "${field1}" "${origin}" "${visaKw}" OR "seeking"`,
       `site:linkedin.com/in/ "Class of ${gradYr}" "${field1}" "${origin}" "seeking" OR "looking"`,
       // Skill gap dorks
       `site:linkedin.com/in/ "upskilling" "MS" "${field1}" "${origin}"`,
-      `site:linkedin.com/in/ "self-taught" OR "bootcamp" "${field1}" "${origin}" "MS" ${gradYr}`,
+      `site:linkedin.com/in/ "self-taught" OR "bootcamp" "${field1}" "${origin}" "MS" ${gradYrStr}`,
       // Frustration intent dorks
-      `site:linkedin.com/in/ "actively looking" "MS" "${field1}" "${origin}" ${gradYr}`,
-      `site:linkedin.com/in/ "open to work" "${field1}" "${origin}" "graduate" ${gradYr}`,
+      `site:linkedin.com/in/ "actively looking" "MS" "${field1}" "${origin}" ${gradYrStr}`,
+      `site:linkedin.com/in/ "open to work" "${field1}" "${origin}" "graduate" ${gradYrStr}`,
       // University-targeted dorks
-      `site:linkedin.com/in/ "${origin}" "graduate student" "${field1}" "${gradYr}"`,
-      ...(field2 ? [`site:linkedin.com/in/ "MS" "${field2}" "${origin}" "OPT" OR "seeking"`] : []),
+      `site:linkedin.com/in/ "${origin}" "graduate student" "${field1}" "${gradYrStr}"`,
+      ...(field2 ? [`site:linkedin.com/in/ "MS" "${field2}" "${origin}" "${visaKw}" OR "seeking"`] : []),
       // Day 1 CPT school dorks
       `site:linkedin.com/in/ "Harrisburg University" OR "Cumberlands" "${field1}" "${origin}"`,
       `site:linkedin.com/in/ "Day 1 CPT" "${field1}" "${origin}" "seeking"`,
@@ -139,7 +156,7 @@ export function buildQueryExamples(params: any, sequence: string[]): string {
       `site:linkedin.com/in/ "available immediately" "${field1}" "${origin}" "OPT"`,
       `site:linkedin.com/in/ "financial assistance" "${field1}" "${origin}" "seeking"`,
       // Resume review seekers
-      `site:linkedin.com "resume review" "${field1}" "${origin}" MS ${gradYr}`,
+      `site:linkedin.com "resume review" "${field1}" "${origin}" MS ${gradYrStr}`,
       `site:linkedin.com "critique my resume" "${field1}" "${origin}"`,
       `site:linkedin.com "resume feedback" "${field1}" "${origin}" "not getting interviews"`,
       // LinkedIn Premium seekers
@@ -162,7 +179,7 @@ export function buildQueryExamples(params: any, sequence: string[]): string {
       `site:linkedin.com "${field1}" "${origin}" "resume.pdf" "seeking" OR "open to work"`,
       `site:drive.google.com "${field1}" "${origin}" "MS" "resume" "OPT" OR "F1"`,
       `site:linkedin.com/posts/ "${field1}" "${origin}" "attached my resume" OR "resume for review" OR "please review my resume"`,
-      `"${field1}" "${origin}" "MS" filetype:pdf "OPT" "email" ${gradYr}`,
+      `"${field1}" "${origin}" "MS" filetype:pdf "${visaKw}" "email" ${gradYrStr}`,
       `"${field1}" "${origin}" "MS" filetype:pdf "WhatsApp" "OPT" OR "F1"`,
       `site:github.com "${field1}" "${origin}" "resume" "MS" "OPT" OR "seeking"`,
       // Regional alma mater dorks
@@ -177,20 +194,23 @@ export function buildQueryExamples(params: any, sequence: string[]): string {
     github: [
       `location:"United States" "${origin}" "open to" OR "looking for" language:Python`,
       `location:"United States" "${field1}" "MS" OR "Masters" ${origin} followers:>1`,
-      `location:"New York" OR location:"San Jose" OR location:"Seattle" "${origin}" "seeking" language:Python`,
+      ...(cityHint
+        ? [`location:${cityHint.split(' OR ').map((c: string) => `"${c}"`).join(' OR location:')} "${origin}" "seeking" language:Python`]
+        : [`location:"New York" OR location:"San Jose" OR location:"Seattle" "${origin}" "seeking" language:Python`]
+      ),
       `location:"Boston" OR location:"Austin" OR location:"Atlanta" "${field1}" "${origin}"`,
       `"${field1}" "${origin}" "open to work" OR "job hunting" language:Python`,
     ],
     reddit: [
       `subreddit:f1visa "${field1}" "no offers" OR "struggling" OR "please help" ${origin}`,
-      `subreddit:f1visa OPT "${field1}" ${gradYr} ${origin}`,
-      `subreddit:cscareerquestions "MS" "${field1}" OPT ${gradYr} "no interviews" OR "resume" OR "rejected"`,
-      `subreddit:cscareerquestions "international student" "${field1}" "entry level" ${gradYr}`,
+      `subreddit:f1visa ${visaKw} "${field1}" ${gradYrStr} ${origin}`,
+      `subreddit:cscareerquestions "MS" "${field1}" ${visaKw} ${gradYrStr} "no interviews" OR "resume" OR "rejected"`,
+      `subreddit:cscareerquestions "international student" "${field1}" "entry level" ${gradYrStr}`,
       `subreddit:gradadmissions "${field1}" "${origin}" ${intKw} "help" OR "advice"`,
-      `subreddit:immigration OPT EAD "${field1}" "job" ${origin}`,
-      `subreddit:indiansabroad "${field1}" job OPT ${gradYr}`,
+      `subreddit:immigration ${visaKw} EAD "${field1}" "job" ${origin}`,
+      `subreddit:indiansabroad "${field1}" job ${visaKw} ${gradYrStr}`,
       `subreddit:ABCDesis "${field1}" "new grad" OR "entry level" OR "struggling"`,
-      `subreddit:usajobs OR subreddit:jobsearchhacks "international" "${field1}" OPT ${gradYr}`,
+      `subreddit:usajobs OR subreddit:jobsearchhacks "international" "${field1}" ${visaKw} ${gradYrStr}`,
       // H1B results window crisis posts
       ...(isH1BResultsWindow() ? [
         `subreddit:f1visa "just found out" "H1B not selected" "${field1}" ${origin}`,
@@ -200,7 +220,7 @@ export function buildQueryExamples(params: any, sequence: string[]): string {
       ] : isH1BSeasonNow() ? [
         `subreddit:f1visa "H1B not selected" OR "didn't get H1B" "${field1}" ${origin}`,
         `subreddit:f1visa "Day 1 CPT" OR "day1 cpt" "${field1}" "job" ${origin}`,
-        `subreddit:immigration "H1B lottery" "not selected" "${field1}" ${gradYr}`,
+        `subreddit:immigration "H1B lottery" "not selected" "${field1}" ${gradYrStr}`,
       ] : []),
       `subreddit:cscareerquestions "TCS" OR "Infosys" OR "Wipro" "product company" "${field1}" ${origin}`,
       ...(field2 ? [`subreddit:f1visa OR subreddit:cscareerquestions "${field2}" OPT struggling ${origin}`] : []),
@@ -237,12 +257,20 @@ export function buildAgentPrompt(params: any): string {
     ? `\n⚠️ H1B SEASON ACTIVE (March–May): H1B lottery registration just closed / results imminent. Thousands of Indian students will find out they didn't get selected — peak panic period. PRIORITISE queries with "H1B not selected", "Day 1 CPT", "OPT extension". These leads have MAXIMUM urgency and will convert fastest.\n`
     : '';
 
+  // Target cities hint for github queries
+  const cityHint = params.targetCities && !/all/i.test(params.targetCities)
+    ? params.targetCities.split(/[,\/]/).map((c: string) => c.trim().split(' ')[0]).filter(Boolean).join(' OR ')
+    : null;
+
   return `You are a Lead Discovery Agent for CareerXcelerator. Find ${target} qualified leads matching the target profile below.
 ${h1bSeasonNote}
 TARGET PROFILE:
 - Audience: ${params.audience}
 - Origin Country: ${params.originCountry}
 - Current Location: ${params.currentLocation}
+- Graduation Year: ${params.graduationYear || 'Any (prefer recent: 2024-2026)'}
+- Destination Country: ${params.visaStatus || 'United States'}
+- Target Cities/Hubs: ${params.targetCities || 'All major tech hubs'}
 - Fields: ${params.fields}
 - Opportunity: ${params.opportunityTypes}
 

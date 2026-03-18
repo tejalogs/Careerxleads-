@@ -235,12 +235,48 @@
 }
 
 .compactHeader h1 {
-  font-size: 1.5rem;
-  margin-bottom: 0.125rem;
+  font-size: 1.6rem;
+  margin-bottom: 0.2rem;
 }
 
 .compactHeader p {
   margin: 0;
+}
+
+.heroBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  background: rgba(66, 103, 178, 0.15);
+  border: 1px solid rgba(66, 103, 178, 0.4);
+  border-radius: 20px;
+  padding: 0.2rem 0.65rem;
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: #93bbff;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  margin-bottom: 0.35rem;
+}
+
+.heroStats {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.heroStat {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-size: 0.72rem;
+  font-weight: 500;
+  color: var(--text-secondary);
+  background: var(--bg-glass);
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  padding: 0.15rem 0.5rem;
 }
 
 .flowWrapper {

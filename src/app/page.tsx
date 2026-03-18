@@ -5,7 +5,7 @@ import GuidedFlow from '@/components/GuidedFlow';
 import LeadTable from '@/components/LeadTable';
 import ErrorBoundary from '@/components/ErrorBoundary';
 import { GenerationParams, Lead, PipelineStats, SearchHistoryEntry } from '@/types';
-import { FiLoader, FiCheckCircle, FiAlertTriangle, FiRefreshCw, FiClock } from 'react-icons/fi';
+import { FiLoader, FiCheckCircle, FiAlertTriangle, FiRefreshCw, FiClock, FiZap, FiGlobe, FiFilter } from 'react-icons/fi';
 import styles from './page.module.css';
 
 const SESSION_KEY = 'careerx_session';
@@ -227,12 +227,21 @@ export default function Home() {
       {/* ── Gathering ── */}
       {phase === 'gathering' && (
         <div className={`${styles.gatheringLayout} animate-fade-in`}>
-          {/* Compact Header for Discovery Flow */}
+          {/* Header */}
           <div className={styles.compactHeader}>
-            <h1 className="text-gradient">Lead Discovery</h1>
-            <p className="text-secondary text-sm">
-              AI-driven candidate sourcing and qualification guardrails.
+            <div className={styles.heroBadge}>
+              <FiZap size={11} />
+              <span>AI-Powered Lead Discovery</span>
+            </div>
+            <h1 className="text-gradient">Find Your Ideal Candidates</h1>
+            <p className="text-secondary text-sm" style={{ marginBottom: '0.5rem' }}>
+              Multi-platform sourcing across LinkedIn, GitHub, Google & Reddit — qualified by Claude AI.
             </p>
+            <div className={styles.heroStats}>
+              <span className={styles.heroStat}><FiGlobe size={11} /> 4 Platforms</span>
+              <span className={styles.heroStat}><FiFilter size={11} /> 50+ Signals</span>
+              <span className={styles.heroStat}><FiZap size={11} /> Real-time Streaming</span>
+            </div>
           </div>
 
           {/* Search history - compact chips */}

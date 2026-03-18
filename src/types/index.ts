@@ -41,9 +41,12 @@ export interface GenerationParams {
   audience: string;
   originCountry: string;
   currentLocation: string;
+  graduationYear: string;
   stage: string;
   fields: string;
+  visaStatus: string;
   opportunityTypes: string;
+  targetCities: string;
   leadCount: string;
 }
 

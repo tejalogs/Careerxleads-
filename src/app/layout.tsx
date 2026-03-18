@@ -1,7 +1,6 @@
 import type { Metadata } from 'next';
 import './globals.css';
 import styles from './layout.module.css';
-import { FiCommand } from 'react-icons/fi';
 
 export const metadata: Metadata = {
   title: 'CareerX Lead Discovery',
@@ -22,8 +21,8 @@ export default function RootLayout({
               <img src="/logo.png" alt="CareerXcelerator Logo" width={32} height={32} className="mr-2" />
               CareerXcelerator <span className={`${styles.textSecondary} ${styles.textSm} ${styles.fontNormal}`}>Lead Discovery</span>
             </div>
-            <div className={styles.userProfile}>
-              <div className={styles.avatar}>CX</div>
+            <div className={styles.headerRight}>
+              <span className={styles.headerMeta}>Multi-platform · Claude AI</span>
             </div>
           </div>
         </header>

@@ -1,6 +1,6 @@
-import React, { useState, useRef, useMemo } from 'react';
+import React, { useState, useRef, useMemo, useEffect } from 'react';
 import styles from './GuidedFlow.module.css';
-import { FiSend, FiArrowRight, FiCommand, FiUser, FiCheckCircle, FiDollarSign, FiInfo } from 'react-icons/fi';
+import { FiSend, FiArrowRight, FiCommand, FiCheckCircle, FiDollarSign, FiInfo } from 'react-icons/fi';
 import { GenerationParams } from '@/types';
 
 interface Message {
@@ -16,47 +16,65 @@ interface Question {
   options?: string[];
 }
 
+// Questions asked in the flow. currentLocation, stage, audience, targetCities are
+// derived automatically from answers rather than asked explicitly.
 const questions: Question[] = [
   {
-    key: 'audience',
-    text: 'What is the primary persona for this discovery?',
-    examples: ['Masters Students', 'Final Year Undergraduate', 'Recent Graduates (2023-24)', 'Early Professionals (1-3 yrs exp)', 'Mid-level (3-5 yrs exp)']
-  },
-  {
     key: 'originCountry',
-    text: 'Which origin country should we prioritize for this batch?',
-    examples: ['India', 'China', 'Nigeria', 'Targeting Diverse Global Students']
+    text: 'Which origin country should we target for this batch?',
+    examples: ['India', 'China', 'Nigeria', 'Philippines', 'Bangladesh', 'Diverse Global Students']
   },
   {
-    key: 'currentLocation',
-    text: 'Where should these candidates be studying or working now?',
-    examples: ['United States (F1/H1B)', 'United Kingdom', 'Canada', 'Ireland', 'Germany']
+    key: 'fields',
+    text: 'Which domain or field of study are we focusing on?',
+    examples: [
+      'Any Domain (all fields)',
+      'Computer Science / Software Engineering',
+      'Data Science / AI / Machine Learning',
+      'Cybersecurity / Cloud / DevOps',
+      'Business Analytics / Finance / Fintech',
+      'Product Management / UX Design',
+      'Electrical / Mechanical Engineering',
+      'Bio-Medical / Healthcare / Pharma',
+      'Marketing / Operations / Consulting'
+    ]
   },
   {
-    key: 'stage',
-    text: 'What is their exact current professional/academic stage?',
+    key: 'graduationYear',
+    text: 'Which graduation cohort(s) should we target?',
     options: [
-      'Current Student (Seeking Internships)', 
-      'Final Year (Seeking Full-time)', 
-      'Recent Graduate (Job Hunting)', 
-      'Working Professional (1-5 yrs exp)'
+      '2024 & 2025 (recent grads — high urgency)',
+      '2025 & 2026 (graduating this year + next)',
+      '2026 & 2027 (current students — internship prep)',
+      '2024, 2025 & 2026 (all recent cohorts)'
     ],
     examples: []
   },
   {
-    key: 'fields',
-    text: 'Which specific fields or tech domains are we focusing on?',
-    examples: ['Computer Science', 'Data Science/AI', 'Business Analytics', 'Management/MBA', 'Bio-Medical Engineering']
+    key: 'visaStatus',
+    text: 'Which destination country are these candidates in?',
+    options: [
+      'United States (OPT / CPT / H1B)',
+      'United Kingdom (Graduate Visa / Tier 2)',
+      'Canada (PGWP / Express Entry)',
+      'Ireland / Australia / UAE / Europe'
+    ],
+    examples: []
   },
   {
     key: 'opportunityTypes',
-    text: 'What is the primary intent we are scanning for?',
-    options: ['Summer Internships 2025', 'Immediate Full-time Hiring', 'Lateral Job Switch (Experienced)', 'Upskilling/Research Opportunities'],
+    text: 'Which role type are we recruiting / sourcing leads for?',
+    options: [
+      'Internships (students actively seeking)',
+      'Entry-level Full-time (new grads)',
+      'Experienced Hire / Lateral Switch',
+      'Upskilling / Bootcamp / Research'
+    ],
     examples: []
   },
   {
     key: 'leadCount',
-    text: 'How many vetted leads (meeting quality score ≥6) should the agent find? (max 100 per run)',
+    text: 'How many vetted leads (quality score ≥6) should the agent find? (max 100 per run)',
     examples: ['25', '50', '75', '100']
   }
 ];
@@ -72,11 +90,16 @@ export default function GuidedFlow({ onComplete }: GuidedFlowProps) {
   ]);
   const [inputValue, setInputValue] = useState('');
   const [answers, setAnswers] = useState<Partial<GenerationParams>>({});
-  // #6: ref always holds the latest answers so handleBeginDiscovery never captures a stale closure
   const latestAnswers = useRef<Partial<GenerationParams>>({});
   const [isGenerating, setIsGenerating] = useState(false);
   const [aiBudget, setAiBudget] = useState<{ total: number; apify: number; ai: number; complexity: string } | null>(null);
   const [isEstimating, setIsEstimating] = useState(false);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  // Auto-scroll to latest message
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages]);
 
   const currentQuestion = questions[currentStep];
 
@@ -157,8 +180,28 @@ export default function GuidedFlow({ onComplete }: GuidedFlowProps) {
   const handleBeginDiscovery = () => {
     setIsGenerating(true);
     setTimeout(() => {
-      // #6: use ref so this always gets the latest answers regardless of closure timing
-      onComplete(latestAnswers.current as GenerationParams);
+      const a = latestAnswers.current;
+      const oppType = (a.opportunityTypes || '').toLowerCase();
+      const isIntern  = oppType.includes('intern');
+      const isLateral = oppType.includes('lateral');
+
+      // Derive fields not asked explicitly in the flow
+      const derived: Partial<GenerationParams> = {
+        audience: isIntern
+          ? 'Current Students / Masters Students (Seeking Internships)'
+          : isLateral
+          ? 'Working Professionals (3-7 yrs exp, career switch)'
+          : 'Recent Graduates / Early Professionals (Job Hunting)',
+        currentLocation: a.visaStatus || 'United States',
+        stage: isIntern
+          ? 'Current Student (Seeking Internships)'
+          : isLateral
+          ? 'Working Professional (3-7 yrs exp)'
+          : 'Recent Graduate (Job Hunting)',
+        targetCities: 'All major tech hubs',
+      };
+
+      onComplete({ ...derived, ...a } as GenerationParams);
     }, 800);
   };
 
@@ -188,29 +231,16 @@ export default function GuidedFlow({ onComplete }: GuidedFlowProps) {
         <div className={styles.messageList}>
           {messages.map((msg) => (
             <div key={msg.id} className={`${styles.messageWrapper} ${msg.sender === 'user' ? styles.userWrapper : styles.aiWrapper}`}>
-              {msg.sender === 'ai' && (
-                <div className={styles.messageAvatarAi}>
-                  <img src="/logo.png" alt="Branding" width={16} height={16} />
-                </div>
-              )}
               <div className={`${styles.message} ${msg.sender === 'user' ? styles.userMessage : styles.aiMessage}`}>
                 {msg.text}
               </div>
-              {msg.sender === 'user' && (
-                <div className={styles.messageAvatarUser}>
-                  <FiUser size={14} />
-                </div>
-              )}
             </div>
           ))}
           {isGenerating && (
             <div className={`${styles.messageWrapper} ${styles.aiWrapper}`}>
-               <div className={styles.messageAvatarAi}>
-                  <img src="/logo.png" alt="Branding" width={16} height={16} />
-                </div>
-                <div className={`${styles.message} ${styles.aiMessage} ${styles.typingIndicator}`}>
-                  <span></span><span></span><span></span>
-                </div>
+              <div className={`${styles.message} ${styles.aiMessage} ${styles.typingIndicator}`}>
+                <span></span><span></span><span></span>
+              </div>
             </div>
           )}
           
@@ -221,6 +251,7 @@ export default function GuidedFlow({ onComplete }: GuidedFlowProps) {
               </button>
             </div>
           )}
+          <div ref={messagesEndRef} />
         </div>
 
         {!isGenerating && currentQuestion && (

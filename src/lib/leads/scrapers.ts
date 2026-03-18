@@ -213,14 +213,10 @@ export async function enrichGitHub(p: any): Promise<any> {
 // ── Platform runners ───────────────────────────────────────────────────────────
 export async function runLinkedIn(queries: string[], limit: number, send: SendEvent): Promise<any[]> {
   if (!APIFY_TOKEN) return MOCK_PROFILES.slice(0, limit);
-  // On Vercel Hobby (60s limit) cap queries so scraping finishes in time for qualification.
-  // Set MAX_LINKEDIN_QUERIES=10 on Pro/Railway to restore full parallelism.
-  const maxQ = parseInt(process.env.MAX_LINKEDIN_QUERIES || (process.env.VERCEL ? '2' : '10'), 10);
-  const cappedQueries = queries.slice(0, maxQ);
-  send('progress', { message: `LinkedIn: Step 1/2 — searching ${cappedQueries.length} quer${cappedQueries.length === 1 ? 'y' : 'ies'} in parallel…` });
+  send('progress', { message: `LinkedIn: Step 1/2 — searching ${queries.length} quer${queries.length === 1 ? 'y' : 'ies'} in parallel…` });
   const perQuery  = Math.max(5, Math.ceil((limit * 2) / queries.length));
   const takePages = Math.max(1, Math.ceil(perQuery / 25));
-  const step1Runs = await Promise.all(cappedQueries.map(q =>
+  const step1Runs = await Promise.all(queries.map(q =>
     startActorRun('harvestapi/linkedin-profile-search', {
       searchQuery: q, maxItems: perQuery, takePages,
       profileScraperMode: 'Short', proxyConfiguration: { useApifyProxy: true },

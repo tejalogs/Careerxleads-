@@ -7,8 +7,8 @@
 
 .processing-card {
   width: 100%;
-  max-width: 600px;
-  padding: 3rem;
+  max-width: 520px;
+  padding: 2rem 1.75rem;
   text-align: center;
 }
 
@@ -17,7 +17,7 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  margin-bottom: 3rem;
+  margin-bottom: 1.25rem;
 }
 
 .pulseRing {
@@ -40,64 +40,49 @@
   z-index: 1;
 }
 
-.processingSteps {
+.terminalFeed {
+  background: rgba(5, 10, 20, 0.7);
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+  padding: 0.75rem 1rem;
+  font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
+  font-size: 0.78rem;
+  text-align: left;
+  max-height: 260px;
+  overflow-y: auto;
   display: flex;
   flex-direction: column;
-  gap: 1.5rem;
-  text-align: left;
+  gap: 0.3rem;
 }
 
-.step {
+.terminalLine {
   display: flex;
-  gap: 1.25rem;
-  padding: 1.25rem;
-  background: rgba(15, 23, 42, 0.4);
-  border: 1px solid var(--border-color);
-  border-radius: 12px;
-  opacity: 0.5;
-  transform: translateX(-10px);
-  transition: all 0.5s ease;
-}
-
-.stepActive {
-  opacity: 1;
-  transform: translateX(0);
-  background: rgba(30, 41, 59, 0.6);
-  border-color: rgba(59, 130, 246, 0.3);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-}
-
-.stepIcon {
-  width: 40px;
-  height: 40px;
-  border-radius: 50%;
-  background: var(--bg-tertiary);
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  align-items: flex-start;
+  gap: 0.6rem;
   color: var(--text-secondary);
-  font-size: 1.25rem;
-  flex-shrink: 0;
-  transition: all 0.5s;
+  line-height: 1.5;
+  opacity: 0.55;
+  transition: opacity 0.3s;
 }
 
-.stepActive .stepIcon {
-  background: linear-gradient(135deg, var(--accent-primary), var(--accent-secondary));
-  color: white;
-  box-shadow: 0 0 15px rgba(59, 130, 246, 0.4);
-}
-
-.stepText h4 {
-  margin: 0;
-  font-size: 1rem;
+.terminalLineActive {
+  opacity: 1;
   color: var(--text-primary);
 }
 
-.stepText p {
-  margin: 0.25rem 0 0;
-  font-size: 0.875rem;
-  color: var(--text-secondary);
+.terminalPrompt {
+  flex-shrink: 0;
+  margin-top: 2px;
+  display: flex;
+  align-items: center;
 }
+
+.processingSteps { display: none; }
+.step { display: none; }
+.stepActive { display: none; }
+.stepIcon { display: none; }
+.stepText h4 { display: none; }
+.stepText p { display: none; }
 
 .resultsHeader {
   margin-bottom: 2rem;

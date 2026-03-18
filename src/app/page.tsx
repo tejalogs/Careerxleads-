@@ -267,15 +267,13 @@ export default function Home() {
             </div>
 
             {agentLog.length > 0 && (
-              <div className={styles.processingSteps}>
+              <div className={styles.terminalFeed}>
                 {agentLog.map((msg, i) => (
-                  <div key={i} className={`${styles.step} ${i === agentLog.length - 1 ? styles.stepActive : ''}`}>
-                    <div className={styles.stepIcon}>
-                      {i === agentLog.length - 1 ? <FiLoader size={14} /> : <FiCheckCircle size={14} />}
-                    </div>
-                    <div className={styles.stepText}>
-                      <p style={{ margin: 0 }}>{msg}</p>
-                    </div>
+                  <div key={i} className={`${styles.terminalLine} ${i === agentLog.length - 1 ? styles.terminalLineActive : ''}`}>
+                    <span className={styles.terminalPrompt}>
+                      {i === agentLog.length - 1 ? <FiLoader size={11} className={styles.spinner} /> : <FiCheckCircle size={11} color="#10b981" />}
+                    </span>
+                    <span>{msg}</span>
                   </div>
                 ))}
               </div>

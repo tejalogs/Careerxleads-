@@ -135,7 +135,7 @@ export async function POST(req: Request) {
       l.seekingInternship ? 'Yes' : 'No',             // K: Seeking Internship
       l.seekingFullTime   ? 'Yes' : 'No',             // L: Seeking Full Time
       l.intentScore ?? '',                            // M: Intent Score
-      l.tier        ?? '',                            // N: Priority
+      ({ 1: 'Hot', 2: 'Warm', 3: 'Cold' } as Record<number,string>)[l.tier] ?? '', // N: Priority
       (l.outreachMessage || '').replace(/\n/g, ' '), // O: Outreach Message
       l.status      || 'new',                         // P: Status
     ]);

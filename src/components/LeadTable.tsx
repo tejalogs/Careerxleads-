@@ -6,7 +6,7 @@ import {
   FiDownload, FiShare2, FiExternalLink, FiAlertCircle, FiCheck,
   FiThumbsUp, FiThumbsDown, FiUserCheck, FiSearch,
   FiChevronUp, FiChevronDown, FiCopy, FiBarChart2, FiX,
-  FiChevronLeft, FiChevronRight,
+  FiChevronLeft, FiChevronRight, FiEdit2, FiX as FiClose,
 } from 'react-icons/fi';
 
 const PAGE_SIZE = 50;
@@ -21,9 +21,9 @@ interface LeadTableProps {
 }
 
 const TIER_META: Record<1 | 2 | 3, { label: string; color: string; bg: string; title: string }> = {
-  1: { label: 'T1', color: '#dc2626', bg: '#fef2f2', title: 'Hot lead (score≥8 + high intent)' },
-  2: { label: 'T2', color: '#d97706', bg: '#fffbeb', title: 'Warm lead (score 6-7 or intent≥2)' },
-  3: { label: 'T3', color: '#64748b', bg: '#f8fafc', title: 'Cold lead (score 5-6)' },
+  1: { label: 'Hot',  color: '#dc2626', bg: '#fef2f2', title: 'Hot lead (score≥8 + high intent)' },
+  2: { label: 'Warm', color: '#d97706', bg: '#fffbeb', title: 'Warm lead (score 6-7 or intent≥2)' },
+  3: { label: 'Cold', color: '#64748b', bg: '#f8fafc', title: 'Cold lead (score 5-6)' },
 };
 
 const PLATFORM_META: Record<string, { label: string; color: string }> = {
@@ -57,10 +57,16 @@ export default function LeadTable({
   const [sortDir, setSortDir]             = useState<'desc' | 'asc'>('desc');
   const [selectedIds, setSelectedIds]     = useState<Set<string>>(new Set());
   const [editedMessages, setEditedMessages] = useState<Record<string, string>>({});
-  const [expandedOutreach, setExpandedOutreach] = useState<string | null>(null);
   const [copiedId, setCopiedId]           = useState<string | null>(null);
   const [showAnalytics, setShowAnalytics] = useState(false);
   const [page, setPage] = useState(0);
+  const [drawerLead, setDrawerLead] = useState<Lead | null>(null);
+
+  const tierCounts = useMemo(() => ({
+    1: leads.filter(l => l.tier === 1).length,
+    2: leads.filter(l => l.tier === 2).length,
+    3: leads.filter(l => l.tier === 3).length,
+  }), [leads]);
 
   const universities = useMemo(
     () => Array.from(new Set(leads.map(l => l.university).filter(Boolean))).sort(),
@@ -167,7 +173,7 @@ export default function LeadTable({
         l.seekingInternship ? 'Yes' : 'No',                          // K: Seeking Internship
         l.seekingFullTime ? 'Yes' : 'No',                            // L: Seeking Full Time
         l.intentScore ?? '',                                         // M: Intent Score
-        l.tier ?? '',                                                // N: Priority
+        l.tier ? TIER_META[l.tier as 1|2|3]?.label ?? '' : '',      // N: Priority
         `"${(msg || '').replace(/"/g, '""').replace(/\n/g, ' ')}"`,  // O: Outreach Message
         l.status || 'new',                                           // P: Status
       ];
@@ -188,6 +194,7 @@ export default function LeadTable({
   const maxAnalyticsVal = (arr: [string, number][]) => Math.max(...arr.map(([, v]) => v), 1);
 
   return (
+    <>
     <div className={styles.tableContainer}>
 
       {/* ── Header ── */}
@@ -236,12 +243,22 @@ export default function LeadTable({
             <input type="range" min={1} max={10} value={minScore}
               onChange={e => setMinScore(Number(e.target.value))} className={styles.scoreSlider} />
           </div>
-          <select className="input-field" value={filterTier} onChange={e => setFilterTier(e.target.value as 'all' | '1' | '2' | '3')}>
-            <option value="all">All Tiers</option>
-            <option value="1">T1 — Hot</option>
-            <option value="2">T2 — Warm</option>
-            <option value="3">T3 — Cold</option>
-          </select>
+          <div className={styles.tierPills}>
+            {(['all', '1', '2', '3'] as const).map(t => {
+              const meta = t !== 'all' ? TIER_META[Number(t) as 1|2|3] : null;
+              return (
+                <button
+                  key={t}
+                  className={`${styles.tierPill} ${filterTier === t ? styles.tierPillActive : ''}`}
+                  style={filterTier === t && meta ? { borderColor: meta.color, color: meta.color } : {}}
+                  onClick={() => setFilterTier(t)}
+                >
+                  {t === 'all' ? 'All' : meta!.label}
+                  <span className={styles.tierPillCount}>{t === 'all' ? leads.length : tierCounts[Number(t) as 1|2|3]}</span>
+                </button>
+              );
+            })}
+          </div>
           <select className="input-field" value={filterReview} onChange={e => setFilterReview(e.target.value)}>
             <option value="all">Any Review</option>
             <option value="approved">Approved</option>
@@ -257,6 +274,33 @@ export default function LeadTable({
               {platforms.map(p => <option key={p} value={p}>{p}</option>)}
             </select>
           )}
+        </div>
+      </div>
+
+      {/* ── Tier summary bar ── */}
+      <div className={styles.summaryBar}>
+        {([1, 2, 3] as const).map(t => {
+          const meta = TIER_META[t];
+          const count = tierCounts[t];
+          const pct = leads.length ? Math.round((count / leads.length) * 100) : 0;
+          return (
+            <div key={t} className={styles.summaryCard}>
+              <span className={styles.summaryLabel}>{meta.label}</span>
+              <span className={styles.summaryCount} style={{ color: meta.color }}>{count}</span>
+              <div className={styles.summaryTrack}>
+                <div className={styles.summaryFill} style={{ width: `${pct}%`, background: meta.color }} />
+              </div>
+              <span className={styles.summaryPct}>{pct}%</span>
+            </div>
+          );
+        })}
+        <div className={styles.summaryCard}>
+          <span className={styles.summaryLabel}>Total</span>
+          <span className={styles.summaryCount} style={{ color: 'var(--text-primary)' }}>{leads.length}</span>
+          <div className={styles.summaryTrack}>
+            <div className={styles.summaryFill} style={{ width: '100%', background: 'var(--accent-primary)', opacity: 0.4 }} />
+          </div>
+          <span className={styles.summaryPct}>100%</span>
         </div>
       </div>
 
@@ -411,13 +455,6 @@ export default function LeadTable({
                       ) : <span className={styles.emptyDash}>—</span>}
                     </td>
 
-                    {/* Review flag */}
-                    <td>
-                      {lead.reviewFlag === 'review_needed'
-                        ? <span className={styles.reviewBadge}><FiAlertCircle size={11} /> Review</span>
-                        : <span className={styles.approvedBadge}><FiCheck size={11} /> OK</span>}
-                    </td>
-
                     {/* Feedback */}
                     <td>
                       <div className={styles.feedbackLoop}>
@@ -436,22 +473,12 @@ export default function LeadTable({
                       </div>
                     </td>
 
-                    {/* Outreach (editable) */}
-                    <td className={styles.messageColumn}>
-                      {expandedOutreach === lead.id ? (
-                        <textarea
-                          className={styles.messageEditor}
-                          value={outreachText}
-                          onChange={e => setEditedMessages(prev => ({ ...prev, [lead.id]: e.target.value }))}
-                          rows={6}
-                          onBlur={() => setExpandedOutreach(null)}
-                          autoFocus
-                        />
-                      ) : (
-                        <div className={styles.messageCard} onClick={() => setExpandedOutreach(lead.id)} title="Click to edit">
-                          {outreachText}
-                        </div>
-                      )}
+                    {/* Outreach — opens drawer */}
+                    <td className={styles.outreachCell}>
+                      <div className={styles.messageCard} onClick={() => setDrawerLead(lead)} title="Click to edit outreach">
+                        <span className={styles.messagePreview}>{outreachText}</span>
+                        <FiEdit2 size={11} className={styles.editHint} />
+                      </div>
                     </td>
                   </tr>
                 );
@@ -496,6 +523,24 @@ export default function LeadTable({
             </div>
 
             <div className={styles.analyticsGrid}>
+              {/* By Priority (tier) */}
+              <div className={styles.analyticsCard}>
+                <h4>By Priority</h4>
+                {([1, 2, 3] as const).map(tier => {
+                  const meta = TIER_META[tier];
+                  const count = tierCounts[tier];
+                  return (
+                    <div key={tier} className={styles.barRow}>
+                      <span className={styles.barLabel} style={{ color: meta.color, fontWeight: 600 }}>{meta.label}</span>
+                      <div className={styles.barTrack}>
+                        <div className={styles.barFill} style={{ width: `${leads.length ? (count / leads.length) * 100 : 0}%`, background: meta.color }} />
+                      </div>
+                      <span className={styles.barCount}>{count}</span>
+                    </div>
+                  );
+                })}
+              </div>
+
               {/* Score distribution */}
               <div className={styles.analyticsCard}>
                 <h4>Score Distribution</h4>
@@ -559,5 +604,114 @@ export default function LeadTable({
         </div>
       )}
     </div>
+
+    {/* ── Outreach Drawer ── */}
+    {drawerLead !== null && (
+      <Drawer
+        lead={drawerLead}
+        editedMessages={editedMessages}
+        onClose={() => setDrawerLead(null)}
+        onEdit={(id, text) => setEditedMessages(prev => ({ ...prev, [id]: text }))}
+        onReset={(id) => setEditedMessages(prev => { const n = { ...prev }; delete n[id]; return n; })}
+        onStatusChange={(id, status) => { onStatusChange(id, status); setDrawerLead(prev => prev ? { ...prev, status } : null); }}
+        onFeedback={(lead, fb) => { onFeedback(lead, fb); setDrawerLead(prev => prev ? { ...prev, feedback: fb } : null); }}
+      />
+    )}
+    </>
+  );
+}
+
+// ── Drawer component (keeps parent narrowing clean) ───────────────────────────
+function Drawer({ lead, editedMessages, onClose, onEdit, onReset, onStatusChange, onFeedback }: {
+  lead: Lead;
+  editedMessages: Record<string, string>;
+  onClose: () => void;
+  onEdit: (id: string, text: string) => void;
+  onReset: (id: string) => void;
+  onStatusChange: (id: string, status: Lead['status']) => void;
+  onFeedback: (lead: Lead, fb: Lead['feedback']) => void;
+}) {
+  const outreachText = editedMessages[lead.id] ?? lead.outreachMessage;
+  const statusColor = STATUS_COLORS[lead.status || 'new'];
+  const tierMeta = lead.tier ? TIER_META[lead.tier] : null;
+
+  return (
+    <>
+      <div className={styles.drawerOverlay} onClick={onClose} />
+      <div className={styles.drawer}>
+        <div className={styles.drawerHeader}>
+          <div style={{ minWidth: 0 }}>
+            <a href={lead.linkedinUrl} target="_blank" rel="noopener noreferrer" className={styles.drawerName}>
+              {lead.name} <FiExternalLink size={12} />
+            </a>
+            {(lead.university || lead.degree || lead.fieldOfStudy) && (
+              <p className={styles.drawerSub}>{[lead.university, lead.degree, lead.fieldOfStudy].filter(Boolean).join(' · ')}</p>
+            )}
+            {(lead.location || lead.graduationYear) && (
+              <p className={styles.drawerSub}>{[lead.location, lead.graduationYear].filter(Boolean).join(' · ')}</p>
+            )}
+          </div>
+          <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexShrink: 0 }}>
+            {tierMeta && (
+              <span style={{ padding: '2px 9px', borderRadius: '4px', fontSize: '0.72rem', fontWeight: 700, background: tierMeta.bg, color: tierMeta.color, border: `1px solid ${tierMeta.color}40` }}>
+                {tierMeta.label}
+              </span>
+            )}
+            <button className={styles.drawerClose} onClick={onClose}><FiClose size={15} /></button>
+          </div>
+        </div>
+
+        {lead.headline && <p className={styles.drawerHeadline}>{lead.headline}</p>}
+
+        <div className={styles.drawerSection}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
+            <span className={styles.drawerSectionLabel}>Outreach Message</span>
+            {editedMessages[lead.id] && (
+              <button style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', background: 'none', border: 'none', cursor: 'pointer' }}
+                onClick={() => onReset(lead.id)}>Reset</button>
+            )}
+          </div>
+          <textarea
+            className={styles.drawerTextarea}
+            value={outreachText}
+            onChange={e => onEdit(lead.id, e.target.value)}
+            rows={9}
+          />
+        </div>
+
+        <div className={styles.drawerSection}>
+          <span className={styles.drawerSectionLabel}>Status</span>
+          <select
+            className={styles.statusSelect}
+            value={lead.status || 'new'}
+            onChange={e => onStatusChange(lead.id, e.target.value as Lead['status'])}
+            style={{ marginTop: '0.4rem', width: '100%', borderColor: `${statusColor}80`, color: statusColor, backgroundColor: `${statusColor}12` }}
+          >
+            {STATUS_OPTIONS.map(s => <option key={s} value={s}>{s}</option>)}
+          </select>
+        </div>
+
+        <div className={styles.drawerSection}>
+          <span className={styles.drawerSectionLabel}>Feedback</span>
+          <div className={styles.feedbackLoop} style={{ marginTop: '0.5rem' }}>
+            <button className={`${styles.feedBtn} ${lead.feedback === 'good_lead' ? styles.feedActive : ''}`}
+              onClick={() => onFeedback(lead, 'good_lead')} title="Good Lead"><FiThumbsUp size={13} /></button>
+            <button className={`${styles.feedBtn} ${lead.feedback === 'irrelevant_lead' ? styles.feedActiveIrrelevant : ''}`}
+              onClick={() => onFeedback(lead, 'irrelevant_lead')} title="Irrelevant"><FiThumbsDown size={13} /></button>
+            <button className={`${styles.feedBtn} ${lead.feedback === 'converted_lead' ? styles.feedActiveConverted : ''}`}
+              onClick={() => onFeedback(lead, 'converted_lead')} title="Converted"><FiUserCheck size={13} /></button>
+          </div>
+        </div>
+
+        <div className={styles.drawerSection}>
+          <span className={styles.drawerSectionLabel}>Review</span>
+          <div style={{ marginTop: '0.5rem' }}>
+            {lead.reviewFlag === 'review_needed'
+              ? <span className={styles.reviewBadge}><FiAlertCircle size={11} /> Needs Review</span>
+              : <span className={styles.approvedBadge}><FiCheck size={11} /> Approved</span>}
+          </div>
+        </div>
+      </div>
+    </>
   );
 }

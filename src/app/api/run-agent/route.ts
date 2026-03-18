@@ -113,13 +113,47 @@ function normalizeLinkedIn(item: any, idx: number, actor: string): any {
 
 function extractEdu(text: string) {
   if (!text) return null;
-  const deg  = text.match(/\b(MS|M\.S\.|MBA|M\.B\.A\.|MEng|M\.Eng|Master(?:s)?(?: of Science)?(?:\s+in)?|MCS|MSCS|MSDS|MS-CS)\b/i);
-  const fld  = text.match(/(?:in|of)\s+([A-Za-z][a-zA-Z\s&\/]{2,30})(?:\s+[@|at]|\s*[-|]|\s+\d{4}|$)/i);
-  const uni  = text.match(/(?:[@|at|@\s])\s*([A-Z][a-zA-Z\s]{4,40})(?:\s*[|·\-,]|$)/i) ||
-               text.match(/([A-Z][a-zA-Z\s]+University|[A-Z][a-zA-Z\s]+Institute|[A-Z]+U\b)/);
-  const yr   = text.match(/\b(202[3-9]|203\d)\b/);
+
+  // Degree
+  const deg = text.match(/\b(MS|M\.S\.|MBA|M\.B\.A\.|MEng|M\.Eng|MTech|M\.Tech|M\.Sc|MSc|Master(?:s)?(?:\s+of\s+\w+)?(?:\s+in)?|MCS|MSCS|MSDS|MS-CS)\b/i);
+
+  // Field of study
+  const fld = text.match(/(?:in|of)\s+([A-Za-z][a-zA-Z\s&\/]{2,35})(?:\s+[@|at]|\s*[-|·,]|\s+\d{4}|$)/i);
+
+  // University — tried in order of specificity
+  let uniMatch: string | null = null;
+
+  // 1) "@ SomeName" — covers @ NYU, @ IIT Bombay, @ Georgia Tech, @ BITS Pilani
+  const atSymbol = text.match(/@\s*([A-Z][A-Za-z.\s]{1,50})(?:\s*[|·\-,]|$)/);
+  if (atSymbol) uniMatch = atSymbol[1].trim();
+
+  // 2) "at University Name" (word boundary)
+  if (!uniMatch) {
+    const atWord = text.match(/\bat\s+([A-Z][A-Za-z.\s&]{3,50})(?:\s*[|·\-,\d]|$)/);
+    if (atWord) uniMatch = atWord[1].trim();
+  }
+
+  // 3) Indian institutional prefixes: IIT, NIT, BITS, IIM, IIIT, IISC
+  if (!uniMatch) {
+    const indian = text.match(/\b(IIT[\s\-]\w+|NIT[\s\-]\w+|BITS[\s\-]\w+|IIM[\s\-]\w+|IIIT[\s\-]\w+|IISc)\b/i);
+    if (indian) uniMatch = indian[1].trim();
+  }
+
+  // 4) "X University" / "University of X" / "X Institute" / "X College" / "X School of"
+  if (!uniMatch) {
+    const std = text.match(/([A-Z][a-zA-Z\s&]+(?:University|Institute of Technology|College|School|Academy)|University\s+of\s+[A-Z][a-zA-Z\s]+)/);
+    if (std) uniMatch = std[1].trim();
+  }
+
+  // 5) Common US/global abbreviations not caught above
+  if (!uniMatch) {
+    const abbrev = text.match(/\b(NYU|USC|ASU|PSU|UT(?:\s+\w+)?|SMU|GMU|GWU|VCU|LSU|FSU|OSU|UMass(?:\s+\w+)?|UConn|UVA|UNC|UIUC|NJIT|RIT|WPI|NEU|BU|UBC|UofT|NUS|NTU)\b/);
+    if (abbrev) uniMatch = abbrev[1].trim();
+  }
+
+  const yr = text.match(/\b(202[3-9]|203\d)\b/);
   if (!deg) return null;
-  return { schoolName: uni?.[1]?.trim() || '', degreeName: deg[0], fieldOfStudy: fld?.[1]?.trim() || '', endDate: yr?.[0] || '' };
+  return { schoolName: uniMatch || '', degreeName: deg[0], fieldOfStudy: fld?.[1]?.trim() || '', endDate: yr?.[0] || '' };
 }
 
 function normalizeGoogle(item: any, idx: number, actor: string): any {
@@ -245,7 +279,93 @@ function assignTier(qualityScore: number, intentScore: number): 1 | 2 | 3 {
 // ── Qualification ─────────────────────────────────────────────────────────────
 const SENIOR_TITLES = ['director', 'vp', 'vice president', 'head of', 'chief', 'cto', 'ceo', 'principal', 'senior manager'];
 const LOW_FIELDS    = ['history', 'philosophy', 'literature', 'fine arts', 'art history', 'music', 'theater'];
-const TIER1_UNIS    = ['mit', 'stanford', 'harvard', 'carnegie mellon', 'uc berkeley', 'berkeley', 'caltech', 'princeton', 'yale', 'columbia', 'cornell', 'university of michigan', 'ucla', 'uiuc', 'university of illinois', 'duke', 'johns hopkins', 'northwestern', 'georgia tech', 'purdue', 'university of washington'];
+
+// Elite/brand-name universities — leads from these are HARD REJECTED (outside ICP).
+// CareerX's ICP is students from non-elite schools who genuinely struggle to land jobs.
+// Grads from these institutions have strong on-campus recruiting pipelines already.
+const ELITE_UNIS = new Set([
+  // ── USA ──
+  'mit', 'massachusetts institute of technology',
+  'stanford', 'stanford university',
+  'harvard', 'harvard university',
+  'carnegie mellon', 'carnegie mellon university', 'cmu',
+  'uc berkeley', 'university of california berkeley', 'berkeley',
+  'caltech', 'california institute of technology',
+  'princeton', 'princeton university',
+  'yale', 'yale university',
+  'columbia', 'columbia university',
+  'cornell', 'cornell university',
+  'university of michigan', 'umich',
+  'ucla', 'university of california los angeles',
+  'uiuc', 'university of illinois', 'illinois urbana',
+  'duke', 'duke university',
+  'johns hopkins', 'jhu',
+  'northwestern', 'northwestern university',
+  'georgia tech', 'georgia institute of technology',
+  'purdue', 'purdue university',
+  'university of washington',
+  'dartmouth', 'dartmouth college',
+  'brown university',
+  'university of pennsylvania', 'upenn', 'wharton',
+  'rice university',
+  'vanderbilt university',
+  'emory university',
+  'university of notre dame',
+  'washington university in st louis', 'wustl',
+  'university of virginia', 'uva',
+  'university of north carolina', 'unc chapel hill',
+  'university of southern california', 'usc viterbi',
+  // ── India (IITs, IIMs, IISc, BITS) ──
+  'indian institute of technology',
+  'iit bombay', 'iit delhi', 'iit madras', 'iit kanpur', 'iit kharagpur',
+  'iit roorkee', 'iit guwahati', 'iit hyderabad', 'iit gandhinagar', 'iit bhu',
+  'iit jodhpur', 'iit patna', 'iit mandi', 'iit tirupati', 'iit palakkad',
+  'iit dharwad', 'iit bhilai', 'iit jammu', 'iit indore', 'iit varanasi',
+  'iisc', 'indian institute of science',
+  'indian institute of management', 'iim ahmedabad', 'iim bangalore',
+  'iim calcutta', 'iim kozhikode', 'iim lucknow', 'iim indore', 'iim shillong',
+  'bits pilani', 'bits goa', 'bits hyderabad',
+  // ── UK ──
+  'university of oxford', 'oxford university',
+  'university of cambridge', 'cambridge university',
+  'imperial college', 'imperial college london',
+  'london school of economics', 'lse',
+  'ucl', 'university college london',
+  // ── Canada ──
+  'university of toronto', 'u of toronto',
+  'university of british columbia', 'ubc',
+  'university of waterloo',
+  'mcgill', 'mcgill university',
+  // ── Singapore ──
+  'national university of singapore', 'nus',
+  'nanyang technological university', 'ntu singapore',
+  // ── Australia ──
+  'university of melbourne',
+  'university of sydney',
+  'unsw', 'university of new south wales',
+  'australian national university', 'anu',
+  // ── Germany ──
+  'tu munich', 'technical university of munich', 'tum',
+  'lmu munich', 'ludwig maximilian university',
+  'rwth aachen',
+  // ── Switzerland ──
+  'eth zurich', 'epfl',
+  // ── China ──
+  'peking university', 'pku',
+  'tsinghua', 'tsinghua university',
+  // ── Hong Kong ──
+  'hkust', 'hong kong university of science and technology',
+]);
+
+/** Returns true if the university name matches any entry in ELITE_UNIS */
+function isEliteUni(university: string): boolean {
+  const u = university.toLowerCase().trim();
+  if (!u) return false;
+  if (ELITE_UNIS.has(u)) return true;
+  // Substring check — catches "IIT Bombay, India" matching "iit bombay", etc.
+  // Only apply for entries ≥7 chars to avoid false positives from short tokens.
+  return Array.from(ELITE_UNIS).some(e => e.length >= 7 && u.includes(e));
+}
 
 function mockScore(p: any): any {
   const edu = p.education?.[0] || {};
@@ -261,12 +381,20 @@ function mockScore(p: any): any {
   const mastersStudent        = /master|ms\b|m\.s\.|mba|m\.b\.a\.|meng|m\.eng|m\.sc/i.test(degree) || /\bms\b|m\.s\.|master|mba|meng|m\.eng|m\.sc/i.test(headline);
   const jobSearchIntent       = /seeking|looking for|open to|internship|full.?time|job hunt|actively/i.test(headline);
   const relevantField         = !LOW_FIELDS.some(f => fieldOfStudy.toLowerCase().includes(f));
-  const profileComplete       = !!(fullName && university && fieldOfStudy && graduationYear && p.linkedinUrl);
-  const eliteUniversity       = TIER1_UNIS.some(t => university.toLowerCase().includes(t));
-
-  // Elite uni is a PENALTY: CareerXcelerator's ICP is students from non-elite schools
-  // who actually struggle to land jobs — MIT/Stanford grads have strong pipelines already
-  const qualityScore = (indianOriginConfirmed ? 3 : 0) + (mastersStudent ? 2 : 0) + (jobSearchIntent ? 2 : 0) + (relevantField ? 1 : 0) + (profileComplete ? 1 : 0) + (eliteUniversity ? -2 : 1);
+  // For Indian students studying IN India, university name is optional —
+  // India has 1000+ institutions and our extractor won't recognise most of them.
+  // For students studying abroad (any nationality), university name is required so
+  // we can verify it is not elite.
+  const locationStr = (p.location || '').toLowerCase();
+  const studyingInIndia = /\bindia\b|mumbai|delhi|bangalore|bengaluru|chennai|hyderabad|kolkata|pune|ahmedabad|jaipur|surat|lucknow|kanpur|nagpur|indore|bhopal|patna|coimbatore|kochi|vizag|noida|gurgaon/i.test(locationStr) || (!locationStr && indianOriginConfirmed && !university);
+  const profileComplete = (indianOriginConfirmed && studyingInIndia)
+    ? !!(fullName && fieldOfStudy && p.linkedinUrl)
+    : !!(fullName && university && fieldOfStudy && graduationYear && p.linkedinUrl);
+  // Hard reject: elite university leads are outside ICP — they already have strong pipelines
+  if (isEliteUni(university)) {
+    return { id: p.id || Math.random().toString(36).slice(2, 11), qualityScore: 0, tier: 3 as const, name: fullName || 'Unknown', linkedinUrl: p.linkedinUrl || '', university, degree, fieldOfStudy, graduationYear, location: p.location || '', headline: p.headline || '', email: p.email || null, socialMediaUrl: null, seekingInternship: false, seekingFullTime: false, intentScore: 1 as const, outreachMessage: '', status: 'new', reviewFlag: 'review_needed' as const, qualityBreakdown: { indianOriginConfirmed: false, mastersStudent: false, jobSearchIntent: false, relevantField: false, profileComplete: false, nonTier1University: false }, metadata: p.metadata || undefined };
+  }
+  const qualityScore = (indianOriginConfirmed ? 3 : 0) + (mastersStudent ? 2 : 0) + (jobSearchIntent ? 2 : 0) + (relevantField ? 1 : 0) + (profileComplete ? 1 : 0) + 1; // +1 non-elite bonus (always, since elite is hard-rejected above)
   const intentScore: 1 | 2 | 3 = jobSearchIntent ? 3 : mastersStudent ? 2 : 1;
   const tier = assignTier(qualityScore, intentScore);
 
@@ -287,7 +415,7 @@ function mockScore(p: any): any {
     outreachMessage: `Hi ${(fullName.split(' ')[0]) || 'there'},\n\nI noticed you're pursuing your ${degree || 'MS'} in ${fieldOfStudy} at ${university || 'your university'}. Many international students struggle converting applications to interviews. CareerXcelerator helps students move from role clarity to real job offers.\n\nHappy to share a few insights if helpful!`,
     status: 'new',
     reviewFlag: qualityScore >= 8 ? 'approved' : 'review_needed',
-    qualityBreakdown: { indianOriginConfirmed, mastersStudent, jobSearchIntent, relevantField, profileComplete, nonTier1University: !eliteUniversity },
+    qualityBreakdown: { indianOriginConfirmed, mastersStudent, jobSearchIntent, relevantField, profileComplete, nonTier1University: true },
     metadata: p.metadata || undefined,
   };
 }
@@ -329,11 +457,16 @@ function analyzeRejections(rawProfiles: any[], qualifiedLeads: any[]): Rejection
     if (SENIOR_TITLES.some(t => headline.includes(t)))                            { breakdown.seniorTitle++;      continue; }
     if (LOW_FIELDS.some(f => field.toLowerCase().includes(f)))                    { breakdown.irrelevantField++;  continue; }
     if (!name || name === 'Unknown' || !p.linkedinUrl)                            { breakdown.missingProfile++;   continue; }
-    if (!edu.schoolName && !edu.degree && !edu.fieldOfStudy && !p.university)     { breakdown.missingEducation++; continue; }
+    // For Indian students studying IN India, missing university name is acceptable — only need degree or field
+    const isIndianName  = /sharma|patel|desai|gupta|singh|kumar|mehta|joshi|kapoor|verma|reddy|rao|iyer|nair|pillai|chandra|krishna|agarwal|malhotra|bose|chatterjee|mukherjee|banerjee|das|ghosh|sen|saha/i.test(name);
+    const pLoc = (p.location || '').toLowerCase();
+    const inIndia = /\bindia\b|mumbai|delhi|bangalore|bengaluru|chennai|hyderabad|kolkata|pune|ahmedabad|jaipur/i.test(pLoc) || (!pLoc && isIndianName && !uni);
+    const hasEnoughEdu = (isIndianName && inIndia) ? !!(edu.degree || edu.fieldOfStudy) : !!(edu.schoolName || edu.degree || edu.fieldOfStudy || p.university);
+    if (!hasEnoughEdu)                                                             { breakdown.missingEducation++; continue; }
     const isMasters = /master|ms\b|m\.s\.|mba|meng|m\.sc/i.test(degree) ||
                       /\bms\b|m\.s\.|master|mba|meng/i.test(headline);
     if (!isMasters)                                                                { breakdown.notMasters++;       continue; }
-    if (TIER1_UNIS.some(t => uni.toLowerCase().includes(t)))                      { breakdown.eliteUniversity++;  continue; }
+    if (isEliteUni(uni))                                                           { breakdown.eliteUniversity++;  continue; }
     const originMatch = /sharma|patel|desai|gupta|singh|kumar|mehta|joshi|kapoor|verma|reddy|rao|iyer|nair|pillai|chandra|krishna|agarwal|malhotra|bose|chatterjee|mukherjee|banerjee|das|ghosh|sen|saha/i.test(name);
     if (!originMatch)                                                              { breakdown.wrongOrigin++;      continue; }
     breakdown.tooLowScore++;
@@ -349,7 +482,7 @@ function analyzeRejections(rawProfiles: any[], qualifiedLeads: any[]): Rejection
     wrongOrigin:       'Add origin country explicitly — e.g. "India" "Indian" or common Indian surnames to queries',
     notMasters:        'Tighten degree filter — add "MS" "Master of Science" "graduate student" to queries',
     missingEducation:  'Profiles lack education data — try more specific university name queries or use google dork with "university" keyword',
-    eliteUniversity:   'Too many IIT/NIT/elite profiles — add regional/state school names or avoid "top university" phrases in queries',
+    eliteUniversity:   'Too many IIT/IIM/elite profiles — explicitly target Tier 2/3 Indian colleges: "private university India" "state university" "deemed university" or name specific schools like Amity, VIT, SRM, Manipal, NMIMS, Symbiosis, Pune University, Anna University, etc.',
     missingProfile:    'Profiles lack URL or name — try longer takePages or a different searchQuery to get more complete profiles',
     seniorTitle:       'Too many senior professionals — add "student" "2025" "recent grad" to exclude experienced hires',
     irrelevantField:   'Wrong field of study — narrow queries to specific relevant fields like "Computer Science" "Data Science" "Engineering"',
@@ -425,11 +558,22 @@ async function qualifyProfiles(profiles: any[], params: any): Promise<any[]> {
 TARGET: Origin=${params.originCountry}, Stage=${params.stage}, Fields=${params.fields}, Opportunity=${params.opportunityTypes}
 
 SCORING (max 10):
-+3 origin matches ${params.originCountry} | +2 Masters student/grad | +2 job/intern intent | +1 relevant field | +1 complete profile | +1 non-elite university | -2 elite/brand-name university (MIT/Stanford/Harvard/CMU/Berkeley etc.)
++3 origin matches ${params.originCountry} | +2 Masters student/grad | +2 job/intern intent | +1 relevant field | +1 complete profile | +1 non-elite university
 
-ICP NOTE: CareerXcelerator targets students from non-elite schools who genuinely struggle to land jobs. Students from brand-name schools already have strong recruiting pipelines — penalize them so they rank lower.
+INDIA RULE (applies only to students studying IN India):
+India has 1000+ universities. For profiles located in India, the university name does NOT need to be well-known or recognisable. ANY Indian university not on the elite rejection list automatically earns the +1 non-elite bonus AND the +1 complete-profile bonus — do NOT penalise an unfamiliar name. Tier 2 and Tier 3 Indian colleges (Amity, VIT, SRM, Manipal, NMIMS, Symbiosis, state universities, deemed universities, private engineering colleges, etc.) are exactly our target. What matters is Masters degree + intent, not brand name.
 
-REJECT if: qualityScore < 6, senior title/X+ yrs exp, irrelevant field, missing name or profile URL.
+ABROAD RULE (students studying outside India — any nationality):
+University name IS required. If the university is elite/brand-name (see list below) → HARD REJECT regardless of nationality. If university name is missing for an abroad profile, treat profileComplete as false (-1 point). Non-elite foreign universities (regional state schools, mid-tier private universities, polytechnics, etc.) are welcomed.
+
+ICP NOTE: CareerXcelerator targets Masters students from NON-ELITE schools who genuinely struggle to land jobs. Students from brand-name schools have strong on-campus recruiting pipelines and are NOT our target audience.
+
+HARD REJECT (omit entirely from the leads array) if ANY of:
+- University is elite/brand-name: MIT, Stanford, Harvard, CMU, Berkeley, Caltech, Princeton, Yale, Columbia, Cornell, UMich, UCLA, UIUC, Duke, JHU, Northwestern, Georgia Tech, Purdue, UWashington, Dartmouth, Brown, UPenn, Wharton — OR any IIT (IIT Bombay/Delhi/Madras/Kanpur/Kharagpur/Roorkee etc.), IIM, IISc, BITS Pilani — OR Oxford, Cambridge, Imperial, LSE, UCL — OR NUS, NTU, UofT, UBC, Waterloo, McGill, ETH Zurich, EPFL, TU Munich, Peking, Tsinghua
+- qualityScore < 6
+- Senior title (director, VP, head of, chief, principal, senior manager)
+- Irrelevant field
+- Missing name or profile URL
 
 For profiles with no education array (Google/GitHub): infer from headline. If can't infer, leave blank — do NOT reject for missing education.
 
@@ -455,6 +599,7 @@ RESPOND ONLY WITH VALID JSON:
 
       const filtered = (leads || []).filter((l: any) => {
         if ((l.qualityScore ?? 0) < 6) return false;
+        if (isEliteUni(l.university || '')) return false;
         if (SENIOR_TITLES.some(t => (l.headline || '').toLowerCase().includes(t))) return false;
         if (LOW_FIELDS.some(f => (l.fieldOfStudy || '').toLowerCase().includes(f))) return false;
         if (!l.name || l.name === 'Unknown' || !(l.linkedinUrl || l.url)) return false;

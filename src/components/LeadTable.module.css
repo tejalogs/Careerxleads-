@@ -678,3 +678,238 @@
   .analyticsGrid { grid-template-columns: 1fr; }
   .actions { width: 100%; }
 }
+
+/* ── Tier Pills ── */
+.tierPills {
+  display: flex;
+  gap: 0.375rem;
+  flex-wrap: wrap;
+}
+.tierPill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.28rem 0.65rem;
+  border-radius: 20px;
+  font-size: 0.78rem;
+  font-weight: 500;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-color);
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.tierPill:hover { background: var(--bg-secondary); color: var(--text-primary); }
+.tierPillActive { background: var(--bg-secondary); color: var(--text-primary); }
+.tierPillCount {
+  font-size: 0.68rem;
+  background: rgba(255,255,255,0.08);
+  border-radius: 10px;
+  padding: 0 5px;
+  min-width: 18px;
+  text-align: center;
+}
+
+/* ── Summary Bar ── */
+.summaryBar {
+  display: flex;
+  gap: 0.625rem;
+  padding: 0.625rem 1.5rem;
+  border-bottom: 1px solid var(--border-color);
+  background: rgba(15, 23, 42, 0.15);
+  flex-wrap: wrap;
+}
+.summaryCard {
+  flex: 1;
+  min-width: 90px;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.4rem 0.75rem;
+  background: var(--bg-glass);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+}
+.summaryLabel {
+  font-size: 0.68rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  flex-shrink: 0;
+}
+.summaryCount {
+  font-size: 1.05rem;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+.summaryTrack {
+  flex: 1;
+  height: 4px;
+  background: var(--bg-tertiary);
+  border-radius: 2px;
+  overflow: hidden;
+  min-width: 24px;
+}
+.summaryFill {
+  height: 100%;
+  border-radius: 2px;
+  transition: width 0.6s ease;
+}
+.summaryPct {
+  font-size: 0.68rem;
+  color: var(--text-muted);
+  flex-shrink: 0;
+}
+
+/* ── Outreach cell ── */
+.outreachTh {
+  display: flex !important;
+  align-items: center;
+  gap: 0.3rem;
+}
+.outreachCell {
+  min-width: 180px;
+  max-width: 260px;
+}
+.messagePreview {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  font-size: 0.78rem;
+  color: var(--text-secondary);
+  line-height: 1.45;
+  flex: 1;
+}
+.editHint {
+  flex-shrink: 0;
+  color: var(--text-muted);
+  opacity: 0;
+  transition: opacity 0.15s;
+  margin-top: 2px;
+}
+.messageCard {
+  background: rgba(15, 23, 42, 0.5);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  padding: 0.45rem 0.55rem;
+  cursor: pointer;
+  transition: border-color 0.2s;
+  display: flex;
+  align-items: flex-start;
+  gap: 0.35rem;
+}
+.messageCard:hover { border-color: rgba(59, 130, 246, 0.4); }
+.messageCard:hover .editHint { opacity: 1; }
+
+/* ── Drawer ── */
+.drawerOverlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.4);
+  backdrop-filter: blur(2px);
+  z-index: 300;
+}
+.drawer {
+  position: fixed;
+  top: 0;
+  right: 0;
+  height: 100vh;
+  width: 380px;
+  max-width: 92vw;
+  background: var(--bg-secondary);
+  border-left: 1px solid var(--border-color);
+  box-shadow: -8px 0 32px rgba(0,0,0,0.35);
+  z-index: 301;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  animation: slideInDrawer 0.2s ease-out;
+}
+@keyframes slideInDrawer {
+  from { transform: translateX(100%); }
+  to   { transform: translateX(0); }
+}
+.drawerHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 0.75rem;
+  padding: 1rem 1.25rem 0.875rem;
+  border-bottom: 1px solid var(--border-color);
+  background: rgba(30, 41, 59, 0.5);
+  position: sticky;
+  top: 0;
+  z-index: 1;
+}
+.drawerName {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  transition: color 0.15s;
+}
+.drawerName:hover { color: var(--accent-primary); }
+.drawerSub {
+  font-size: 0.77rem;
+  color: var(--text-secondary);
+  margin: 0.15rem 0 0;
+  line-height: 1.4;
+}
+.drawerClose {
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  background: var(--bg-tertiary);
+  color: var(--text-secondary);
+  border: 1px solid var(--border-color);
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: all 0.15s;
+}
+.drawerClose:hover { color: var(--text-primary); background: var(--bg-primary); }
+.drawerHeadline {
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  line-height: 1.5;
+  padding: 0.625rem 1.25rem;
+  border-bottom: 1px solid var(--border-color);
+  margin: 0;
+  background: rgba(15,23,42,0.2);
+}
+.drawerSection {
+  padding: 0.875rem 1.25rem;
+  border-bottom: 1px solid var(--border-color);
+}
+.drawerSectionLabel {
+  font-size: 0.68rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-secondary);
+}
+.drawerTextarea {
+  width: 100%;
+  background: var(--bg-primary);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  padding: 0.75rem;
+  font-size: 0.8rem;
+  color: var(--text-primary);
+  line-height: 1.55;
+  resize: vertical;
+  outline: none;
+  font-family: inherit;
+  transition: border-color 0.2s;
+  margin-top: 0.5rem;
+}
+.drawerTextarea:focus {
+  border-color: var(--accent-primary);
+  box-shadow: 0 0 0 2px rgba(66,103,178,0.15);
+}

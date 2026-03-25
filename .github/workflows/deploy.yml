@@ -1,0 +1,49 @@
+name: Trigger Next.js Deployment
+
+on:
+  push:
+    branches:
+      - main  # only main branch triggers this workflow
+
+jobs:
+  check-and-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+        with:
+          token: ${{ secrets.DEPLOY_USER_TOKEN }}
+
+      - name: Get commit message first word
+        id: get_commit_message
+        run: |
+          first_word=$(git log --format=%s -n 1 ${{ github.sha }} | awk '{print $1}')
+          echo "commit_message=$first_word" >> $GITHUB_OUTPUT
+
+      - name: Set branch name
+        id: set_branch
+        run: echo "branch_name=${GITHUB_REF#refs/heads/}" >> $GITHUB_OUTPUT
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: 18
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build Next.js project
+        run: npm run build
+
+      - name: Check commit message and deploy
+        if: startsWith(steps.get_commit_message.outputs.commit_message, 'trigger-deploy')
+        run: |
+          echo "Commit message starts with 'trigger-deploy'. Proceeding with deployment."
+          echo "Current branch: ${{ steps.set_branch.outputs.branch_name }}"
+
+          git config user.name "edubot-sirian"
+          git config user.email "info@edubottechnologies.com"
+
+          # Optional empty commit to trigger deployment hooks
+          git commit --allow-empty -m "Deployment triggered from ${{ steps.set_branch.outputs.branch_name }}"
+          git push origin ${{ steps.set_branch.outputs.branch_name }}

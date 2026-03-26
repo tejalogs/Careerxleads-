@@ -1,11 +1,15 @@
 import { NextResponse } from 'next/server';
 import { google } from 'googleapis';
+import { requireAuth } from '@/lib/auth';
 
 export const maxDuration = 60; // 1 min — Sheets API writes
 
 const targetSheetId = process.env.GOOGLE_SHEETS_ID;
 
 export async function POST(req: Request) {
+  const authError = requireAuth(req);
+  if (authError) return authError;
+
   try {
     let body: any;
     try { body = await req.json(); } catch {

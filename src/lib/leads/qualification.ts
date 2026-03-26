@@ -91,22 +91,36 @@ export function mockScore(p: any): any {
   };
 }
 
+// Hard cap to prevent unbounded API token burn
+const MAX_PROFILES = 500;
+
 export async function qualifyProfiles(
   profiles: any[],
   params: any,
   onTokens?: (input: number, output: number) => void,
 ): Promise<any[]> {
+  const capped = profiles.slice(0, MAX_PROFILES);
+  if (capped.length < profiles.length) {
+    console.warn(`[qualify] Capped from ${profiles.length} to ${MAX_PROFILES} profiles`);
+  }
+
   if (!process.env.ANTHROPIC_API_KEY) {
-    return profiles.map(mockScore).filter(l => l.qualityScore >= 6);
+    return capped.map(mockScore).filter(l => l.qualityScore >= 6);
   }
 
   const CHUNK = 100;
+  const CONCURRENCY = 3; // Process up to 3 chunks in parallel
   const allLeads: any[] = [];
 
-  for (let i = 0; i < profiles.length; i += CHUNK) {
-    const chunk = profiles.slice(i, i + CHUNK);
-    try {
-      // Build phone lookup from pre-Claude enriched profiles (Claude never sees/returns phone)
+  const chunks: any[][] = [];
+  for (let i = 0; i < capped.length; i += CHUNK) {
+    chunks.push(capped.slice(i, i + CHUNK));
+  }
+
+  // Process chunks in parallel batches
+  for (let b = 0; b < chunks.length; b += CONCURRENCY) {
+    const batch = chunks.slice(b, b + CONCURRENCY);
+    const results = await Promise.allSettled(batch.map(async (chunk) => {
       const phoneMap = new Map(chunk.map((p: any) => [String(p.id), p.phone || null]));
 
       const prompt = `You are a Lead Qualifier for CareerXcelerator, a platform helping international students land jobs in the US.
@@ -213,9 +227,17 @@ RESPOND ONLY WITH VALID JSON:
         };
       });
 
-      allLeads.push(...filtered);
-    } catch {
-      allLeads.push(...chunk.map(mockScore).filter(l => l.qualityScore >= 6));
+      return filtered;
+    }));
+
+    for (let r = 0; r < results.length; r++) {
+      const result = results[r];
+      if (result.status === 'fulfilled') {
+        allLeads.push(...result.value);
+      } else {
+        // Fallback to local scoring on API failure
+        allLeads.push(...batch[r].map(mockScore).filter(l => l.qualityScore >= 6));
+      }
     }
   }
   return allLeads;

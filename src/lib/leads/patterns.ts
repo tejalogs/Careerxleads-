@@ -82,7 +82,14 @@ export function isEliteUni(university: string): boolean {
   const u = university.toLowerCase().trim();
   if (!u) return false;
   if (ELITE_UNIS.has(u)) return true;
-  return Array.from(ELITE_UNIS).some(e => e.length >= 7 && u.includes(e));
+  // Word-boundary check: match only if the elite name appears as a complete
+  // word/phrase within the university string (prevents "Columbia" matching
+  // "British Columbia" or "Stanford" matching "Stanford-adjacent Community College")
+  return Array.from(ELITE_UNIS).some(e => {
+    if (e.length < 7) return false;
+    const re = new RegExp(`(?:^|\\W)${e.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?:\\W|$)`, 'i');
+    return re.test(u);
+  });
 }
 
 // ── University tiering ────────────────────────────────────────────────────────

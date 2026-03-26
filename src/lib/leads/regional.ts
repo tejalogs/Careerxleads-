@@ -80,29 +80,30 @@ export function detectRegionalTag(p: any): string | undefined {
   return undefined;
 }
 
-/** Returns the regional outreach suffix with optional alma mater reference. */
+/** Returns the regional outreach suffix with optional alma mater reference.
+ *  Always starts with a sentence break so it reads naturally when appended. */
 export function buildRegionalSuffix(tag: string | undefined, undergradSchool: string | null): string {
   if (!tag) return '';
   const almaRef = undergradSchool ? ` (${undergradSchool})` : '';
   switch (tag) {
     case 'Telugu':
-      return ` I've helped many Telugu engineers${almaRef} navigate this exact path — JNTU/Osmania background to US product companies is our sweet spot.`;
+      return `\n\nP.S. I've helped many Telugu engineers${almaRef} navigate this exact path — JNTU/Osmania background to US product companies is our sweet spot.`;
     case 'Tamil':
-      return ` Many students${almaRef} from the Tamil community have landed FAANG offers through our network. Anna Uni / SRM / VIT grads consistently perform well in our programme.`;
+      return `\n\nP.S. Many students${almaRef} from the Tamil community have landed FAANG offers through our network. Anna Uni / SRM / VIT grads consistently perform well in our programme.`;
     case 'Bengali':
-      return ` We have a strong track record with Jadavpur / Calcutta University engineers${almaRef} making this exact transition to US product companies.`;
+      return `\n\nP.S. We have a strong track record with Jadavpur / Calcutta University engineers${almaRef} making this exact transition to US product companies.`;
     case 'Marathi':
-      return ` I've worked with many engineers${almaRef} making the Pune / Mumbai to US product-company jump — it's a well-trodden path once you have the right network.`;
+      return `\n\nP.S. I've worked with many engineers${almaRef} making the Pune / Mumbai to US product-company jump — it's a well-trodden path once you have the right network.`;
     case 'Punjabi':
-      return ` Our Punjabi engineering community${almaRef} has a strong referral network specifically for this kind of service-to-product pivot.`;
+      return `\n\nP.S. Our Punjabi engineering community${almaRef} has a strong referral network specifically for this kind of service-to-product pivot.`;
     case 'Gujarati':
-      return ` Our community of Desi engineers${almaRef} has navigated this exact situation and come out on the other side with offers.`;
+      return `\n\nP.S. Our community of Desi engineers${almaRef} has navigated this exact situation and come out on the other side with offers.`;
     case 'Kannada':
-      return ` We've helped many VTU / MSRIT engineers${almaRef} bridge from Bengaluru service roles to US product-company offers.`;
+      return `\n\nP.S. We've helped many VTU / MSRIT engineers${almaRef} bridge from Bengaluru service roles to US product-company offers.`;
     case 'Malayalam':
-      return ` Kerala engineers${almaRef} in our network consistently land product company offers — the technical foundation is strong, the network just needs to be built.`;
+      return `\n\nP.S. Kerala engineers${almaRef} in our network consistently land product company offers — the technical foundation is strong, the network just needs to be built.`;
     case 'Hindi':
-      return ` Transitioning from${almaRef ? almaRef : ' a North Indian college'} to a US product company requires a specific playbook — and we have it.`;
+      return `\n\nP.S. Transitioning from${almaRef ? almaRef : ' a North Indian college'} to a US product company requires a specific playbook — and we have it.`;
     default:
       return '';
   }

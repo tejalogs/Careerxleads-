@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { requireAuth } from '@/lib/auth';
 
 const APIFY_TOKEN = process.env.APIFY_API_TOKEN || '';
 const APIFY_BASE  = 'https://api.apify.com/v2';
@@ -345,6 +346,9 @@ async function runSingleActor(actorId: string, queries: string[], limit: number)
 
 // ── Route handler ─────────────────────────────────────────────────────────────
 export async function POST(req: Request) {
+  const authError = requireAuth(req);
+  if (authError) return authError;
+
   try {
     const body = await req.json();
     const strategy = body.strategy || {};

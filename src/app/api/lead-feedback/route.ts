@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { google } from 'googleapis';
+import { requireAuth } from '@/lib/auth';
 
 // #13: In-memory store kept as a fast read cache; all entries also persisted to Sheets
 const feedbackStore: Record<string, { feedback: string; timestamp: string; leadId: string; name?: string }> = {};
@@ -50,6 +51,9 @@ async function persistToSheets(entry: {
 }
 
 export async function POST(req: Request) {
+  const authError = requireAuth(req);
+  if (authError) return authError;
+
   try {
     const { leadId, linkedinUrl, feedback, name } = await req.json();
 
@@ -80,7 +84,10 @@ export async function POST(req: Request) {
   }
 }
 
-export async function GET() {
+export async function GET(req: Request) {
+  const authError = requireAuth(req);
+  if (authError) return authError;
+
   const values = Object.values(feedbackStore);
   const stats = {
     total:     values.length,

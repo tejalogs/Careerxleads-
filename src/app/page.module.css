@@ -77,12 +77,6 @@
   align-items: center;
 }
 
-.processingSteps { display: none; }
-.step { display: none; }
-.stepActive { display: none; }
-.stepIcon { display: none; }
-.stepText h4 { display: none; }
-.stepText p { display: none; }
 
 .resultsHeader {
   margin-bottom: 2rem;

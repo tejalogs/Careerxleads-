@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import Anthropic from '@anthropic-ai/sdk';
+import { requireAuth } from '@/lib/auth';
 
 const anthropic = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY || '',
@@ -8,6 +9,9 @@ const anthropic = new Anthropic({
 const CLAUDE_MODEL = process.env.CLAUDE_MODEL || 'claude-sonnet-4-6';
 
 export async function POST(req: Request) {
+  const authError = requireAuth(req);
+  if (authError) return authError;
+
   try {
     const { params } = await req.json();
     const leadCount = parseInt(params.leadCount, 10) || 100;
@@ -59,7 +63,19 @@ export async function POST(req: Request) {
         throw new Error('Unexpected response shape from Claude');
       }
       const responseContent = msg.content[0].text;
-      const estimate = JSON.parse(responseContent.replace(/```json/g, '').replace(/```/g, '').trim());
+      let estimate: any;
+      try {
+        estimate = JSON.parse(responseContent.replace(/```json/g, '').replace(/```/g, '').trim());
+      } catch {
+        console.error('[estimate-budget] Failed to parse Claude JSON:', responseContent.slice(0, 200));
+        return NextResponse.json({
+          total: leadCount * 0.007,
+          apify: leadCount * 0.005,
+          ai: leadCount * 0.002,
+          complexity: 'Medium',
+          reasoning: 'Fallback estimation — AI returned invalid JSON.'
+        });
+      }
 
       return NextResponse.json(estimate);
 

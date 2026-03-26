@@ -22,16 +22,27 @@ export function getGradDateEstimate(gradYr: number, headline: string): Date {
   return new Date(gradYr, 4, 15); // default: May 15
 }
 
-/** H1B lottery season: March 1 – May 31 (registration March, results April/May) */
+// H1B dates are configurable via env vars — USCIS dates vary by year.
+// Defaults: season March–May, results window March 15 – May 15.
+const H1B_SEASON_START = parseInt(process.env.H1B_SEASON_START_MONTH || '3', 10); // 1-indexed month
+const H1B_SEASON_END   = parseInt(process.env.H1B_SEASON_END_MONTH   || '5', 10);
+const H1B_RESULTS_START_MONTH = parseInt(process.env.H1B_RESULTS_START_MONTH || '3', 10);
+const H1B_RESULTS_START_DAY   = parseInt(process.env.H1B_RESULTS_START_DAY   || '15', 10);
+const H1B_RESULTS_END_MONTH   = parseInt(process.env.H1B_RESULTS_END_MONTH   || '5', 10);
+const H1B_RESULTS_END_DAY     = parseInt(process.env.H1B_RESULTS_END_DAY     || '15', 10);
+
+/** H1B lottery season (default: March–May, configurable via H1B_SEASON_* env vars) */
 export function isH1BSeasonNow(): boolean {
-  const m = new Date().getMonth(); // 0=Jan
-  return m >= 2 && m <= 4;
+  const m = new Date().getMonth() + 1; // 1=Jan
+  return m >= H1B_SEASON_START && m <= H1B_SEASON_END;
 }
 
-/** H1B Results Window: March 25 – April 30 (USCIS announces lottery selections) */
+/** H1B Results Window (default: March 15 – May 15, configurable via H1B_RESULTS_* env vars) */
 export function isH1BResultsWindow(): boolean {
   const now = new Date();
-  const m = now.getMonth();
+  const m = now.getMonth() + 1; // 1=Jan
   const d = now.getDate();
-  return (m === 2 && d >= 25) || m === 3;
+  const afterStart = m > H1B_RESULTS_START_MONTH || (m === H1B_RESULTS_START_MONTH && d >= H1B_RESULTS_START_DAY);
+  const beforeEnd  = m < H1B_RESULTS_END_MONTH   || (m === H1B_RESULTS_END_MONTH   && d <= H1B_RESULTS_END_DAY);
+  return afterStart && beforeEnd;
 }

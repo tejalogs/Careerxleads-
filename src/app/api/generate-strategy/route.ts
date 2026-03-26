@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { GenerationParams } from '@/types';
 import Anthropic from '@anthropic-ai/sdk';
+import { requireAuth } from '@/lib/auth';
 
 const anthropic = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY || '',
@@ -91,6 +92,9 @@ const DEFAULT_STRATEGY = {
 };
 
 export async function POST(req: Request) {
+  const authError = requireAuth(req);
+  if (authError) return authError;
+
   try {
     const params = await req.json() as GenerationParams;
 
@@ -177,7 +181,13 @@ Respond ONLY with this exact JSON (no markdown, no explanation):
       }
 
       const jsonStr = msg.content[0].text.replace(/```json/g, '').replace(/```/g, '').trim();
-      const strategy = JSON.parse(jsonStr);
+      let strategy: any;
+      try {
+        strategy = JSON.parse(jsonStr);
+      } catch {
+        console.error('[generate-strategy] Failed to parse Claude JSON:', jsonStr.slice(0, 200));
+        return NextResponse.json({ ...DEFAULT_STRATEGY, warning: 'AI returned invalid JSON; using default strategy' });
+      }
 
       if (strategy.reasoning) {
         console.log('[generate-strategy] Reasoning:', strategy.reasoning);

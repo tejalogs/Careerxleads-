@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import Anthropic from '@anthropic-ai/sdk';
 import { Lead } from '@/types';
+import { requireAuth } from '@/lib/auth';
 
 export const maxDuration = 120; // 2 min — Claude batch qualification
 
@@ -210,6 +211,9 @@ RESPOND ONLY WITH THIS EXACT JSON (no markdown, no explanation):
 }
 
 export async function POST(req: Request) {
+  const authError = requireAuth(req);
+  if (authError) return authError;
+
   try {
     const { profiles, params } = await req.json();
     const scrapedCount = (profiles || []).length;

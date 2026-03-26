@@ -2,6 +2,7 @@ import React, { useState, useRef, useMemo, useEffect } from 'react';
 import styles from './GuidedFlow.module.css';
 import { FiSend, FiArrowRight, FiCommand, FiCheckCircle, FiDollarSign, FiInfo } from 'react-icons/fi';
 import { GenerationParams } from '@/types';
+import { apiFetch } from '@/lib/api-client';
 
 interface Message {
   id: string;
@@ -90,7 +91,7 @@ export default function GuidedFlow({ onComplete }: GuidedFlowProps) {
   ]);
   const [inputValue, setInputValue] = useState('');
   const [answers, setAnswers] = useState<Partial<GenerationParams>>({});
-  const latestAnswers = useRef<Partial<GenerationParams>>({});
+  const latestAnswersRef = useRef<Partial<GenerationParams>>({});
   const [isGenerating, setIsGenerating] = useState(false);
   const [aiBudget, setAiBudget] = useState<{ total: number; apify: number; ai: number; complexity: string } | null>(null);
   const [isEstimating, setIsEstimating] = useState(false);
@@ -124,7 +125,7 @@ export default function GuidedFlow({ onComplete }: GuidedFlowProps) {
       : text;
     const newAnswers = { ...answers, [currentQuestion.key]: value };
     setAnswers(newAnswers);
-    latestAnswers.current = newAnswers; // #6: keep ref in sync
+    latestAnswersRef.current = newAnswers;
 
     if (currentStep < questions.length - 1) {
       // Simulate slight delay for AI typing feel
@@ -143,17 +144,28 @@ export default function GuidedFlow({ onComplete }: GuidedFlowProps) {
         { id: (Date.now() + 1).toString(), sender: 'ai', text: "Analyzing your requirements to estimate the discovery budget and server resources..." }
       ]);
 
-      // Call AI Estimation API
-      fetch('/api/estimate-budget', {
+      // Call AI Estimation API with timeout
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 15_000);
+
+      apiFetch('/api/estimate-budget', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ params: newAnswers })
+        body: JSON.stringify({ params: newAnswers }),
+        signal: controller.signal,
       })
-      .then(res => res.json())
+      .then(res => {
+        if (!res.ok) throw new Error(`Estimation failed (${res.status})`);
+        return res.json();
+      })
       .then(estimate => {
+        clearTimeout(timeout);
+        // Validate response shape before using
+        if (typeof estimate?.total !== 'number' || typeof estimate?.complexity !== 'string') {
+          throw new Error('Invalid estimation response');
+        }
         setAiBudget(estimate);
         setIsEstimating(false);
-        
+
         setTimeout(() => {
           setMessages(prev => [
             ...prev,
@@ -162,15 +174,18 @@ export default function GuidedFlow({ onComplete }: GuidedFlowProps) {
         }, 1000);
       })
       .catch(err => {
-        // #12: show fallback budget and let the user proceed — estimation is not blocking
+        clearTimeout(timeout);
         console.error('Estimation failed:', err);
         const count = parseInt((newAnswers.leadCount as string) || '100', 10) || 100;
         setAiBudget({ total: count * 0.007, apify: count * 0.005, ai: count * 0.002, complexity: 'Medium' });
         setIsEstimating(false);
+        const reason = err instanceof Error && err.name === 'AbortError'
+          ? 'Budget estimation timed out — using standard rates.'
+          : 'Budget estimation unavailable — using standard rates. You can still proceed with discovery.';
         setTimeout(() => {
           setMessages(prev => [
             ...prev,
-            { id: (Date.now() + 2).toString(), sender: 'ai', text: "Budget estimation unavailable — using standard rates. You can still proceed with discovery." }
+            { id: (Date.now() + 2).toString(), sender: 'ai', text: reason }
           ]);
         }, 500);
       });
@@ -180,7 +195,7 @@ export default function GuidedFlow({ onComplete }: GuidedFlowProps) {
   const handleBeginDiscovery = () => {
     setIsGenerating(true);
     setTimeout(() => {
-      const a = latestAnswers.current;
+      const a = latestAnswersRef.current;
       const oppType = (a.opportunityTypes || '').toLowerCase();
       const isIntern  = oppType.includes('intern');
       const isLateral = oppType.includes('lateral');

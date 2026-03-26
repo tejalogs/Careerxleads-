@@ -1,4 +1,5 @@
-import { SENIOR_TITLES, LOW_FIELDS, INDIAN_SURNAME_RE, INDIAN_UNI_RE, DESI_LANGUAGE_RE, ISA_ORG_RE, INDIA_PREP_RE, isEliteUni } from './patterns';
+import { SENIOR_TITLES, LOW_FIELDS, isEliteUni } from './patterns';
+import { checkIndianOrigin } from './origin';
 
 export interface RejectionAnalysis {
   breakdown: Record<string, number>;
@@ -41,15 +42,8 @@ export function analyzeRejections(rawProfiles: any[], qualifiedLeads: any[]): Re
                    || /\bms\b|m\.s\.|master|mba|meng/i.test(headline);
     if (!isMasters)                                                              { breakdown.notMasters++;      continue; }
     if (isEliteUni(uni))                                                         { breakdown.eliteUniversity++; continue; }
-    // Origin check
-    const undergradEduR = p.education?.[1] || {};
-    const btechR  = /b\.?tech|b\.?e\b|bachelor of (engineering|technology)/i.test(undergradEduR.degreeName || '')
-                 && INDIAN_UNI_RE.test((undergradEduR.schoolName || '').toLowerCase());
-    const langR   = DESI_LANGUAGE_RE.test((p.languages || []).map((l: any) => (l.name || l || '')).join(' '));
-    const isaR    = ISA_ORG_RE.test((p.organizations || []).map((o: any) => (o.organizationName || o.name || '')).join(' '));
-    const prepR   = INDIA_PREP_RE.test(`${headline} ${p.summary || ''}`);
-    const originMatch = INDIAN_SURNAME_RE.test(name) || btechR || langR || isaR || prepR;
-    if (!originMatch)                                                            { breakdown.wrongOrigin++;     continue; }
+    // Origin check — uses same 5-signal function as qualification
+    if (!checkIndianOrigin(p))                                                   { breakdown.wrongOrigin++;     continue; }
     breakdown.tooLowScore++;
   }
 
@@ -81,7 +75,7 @@ export function formatRejectionFeedback(raw: any[], qualified: any[], scraped: n
   const parts = Object.entries(analysis.breakdown)
     .filter(([, v]) => v > 0).sort(([, a], [, b]) => b - a).slice(0, 4)
     .map(([k, v]) => `${v} ${k.replace(/([A-Z])/g, ' $1').toLowerCase()}`).join(' | ');
-  const unis   = analysis.topUniversities.map(([u, n]) => `${u.split(' ').slice(-2).join(' ')} (${n})`).join(', ');
+  const unis   = analysis.topUniversities.map(([u, n]) => `${u.length > 30 ? u.slice(0, 28) + '…' : u} (${n})`).join(', ');
   const fields = analysis.topFields.map(([f, n]) => `${f} (${n})`).join(', ');
   return [
     `REJECTED ${rejected}: ${parts || 'various reasons'}`,

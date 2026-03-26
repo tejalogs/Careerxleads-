@@ -10,14 +10,15 @@ import type { SignalSet } from './signals';
  * - No internship: +1 (was +2 — structural gap, not acute pain)
  * - Uni tier 3: removed (not distinctive enough)
  * - Thin profile: removed (too noisy, unrelated to genuine struggle)
+ * - CPT school: +5 base (was auto-10 — now considers other signals for nuance)
+ * - Comment intent: +2 (was +3 — single comment shouldn't auto-Tier-1)
  *
- * New max path: OPT critical (4) + comment intent (3) + visa (2) + H1B (2) = 11 → cap 10
+ * New max path: CPT (5) + OPT critical (4) + visa (2) = 11 → cap 10
  * To hit 6: OPT window (3) + frustration (2) + no internship (1) is sufficient.
  */
 export function calcStruggleScore(s: SignalSet): number {
-  if (s.cptSchool) return 10; // survival mode — auto max
-
-  let score = 0;
+  // CPT school is high-urgency but should still consider other context
+  let score = s.cptSchool ? 5 : 0; // strong base, not auto-max
 
   // OPT urgency — else-if prevents double-counting the critical window
   if (s.daysAgo >= 70 && s.daysAgo <= 85 && s.stillSearching) score += 4; // CRITICAL: ~2 wks left
@@ -27,7 +28,7 @@ export function calcStruggleScore(s: SignalSet): number {
   else if (s.daysAgo > 180 && s.daysAgo <= 730) score += 1; // silent
 
   // High-priority signals
-  if (s.commentIntent) score += 3; // publicly raised hand on job post
+  if (s.commentIntent) score += 2; // publicly raised hand — warm but not +3 alone
   if (s.visaStruggle) score += 2;
   if (s.h1bPanic || s.h1bResultsPanic) score += 2;
   if (s.bodyShopExit && s.stillSearching) score += 2;

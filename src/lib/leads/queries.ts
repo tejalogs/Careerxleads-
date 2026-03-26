@@ -42,8 +42,10 @@ export function buildPlatformStrategy(params: any): PlatformStrategy {
 export function buildQueryExamples(params: any, sequence: string[]): string {
   const origin   = params.originCountry || 'India';
   const fields   = params.fields || 'Computer Science';
-  const field1   = fields.split(',')[0].trim();
-  const field2   = (fields.split(',')[1] || '').trim();
+  const fieldParts: string[] = fields.split(',').map((f: string) => f.trim()).filter(Boolean);
+  const field1 = fieldParts[0] || fields.trim();
+  const field2 = fieldParts[1] || '';
+  const extraFields: string[] = fieldParts.slice(2);
 
   // Graduation year: prefer user-specified, fall back to computed next year
   const rawGradYr = (params.graduationYear || '').match(/\d{4}/g);
@@ -64,7 +66,7 @@ export function buildQueryExamples(params: any, sequence: string[]): string {
 
   // Target city hint for GitHub location queries
   const cityHint = params.targetCities && !/all/i.test(params.targetCities)
-    ? params.targetCities.split(/[,\/]/).map((c: string) => c.trim().split(' ')[0]).filter(Boolean).join(' OR ')
+    ? params.targetCities.split(/[,\/]/).map((c: string) => c.trim()).filter(Boolean).join(' OR ')
     : null;
 
   const exMap: Record<string, string[]> = {
@@ -91,6 +93,7 @@ export function buildQueryExamples(params: any, sequence: string[]): string {
       `"self-taught" OR "bootcamp" "${field1}" MS "${origin}" "seeking"`,
       // Alternate grad year + field2
       ...(field2 ? [`MS "${field2}" ${origin} ${gradYrStr} ${intent}`] : []),
+      ...extraFields.map(f => `MS "${f}" ${origin} ${gradYrStr} ${intent}`),
       `"${field1}" "${origin}" "CPT" OR "${visaKw}" ${gradYr2} entry level`,
       // Comment intent: person actively asked for referrals
       `"interested" "refer me" "${field1}" MS ${origin} ${gradYrStr}`,
@@ -135,6 +138,7 @@ export function buildQueryExamples(params: any, sequence: string[]): string {
       // University-targeted dorks
       `site:linkedin.com/in/ "${origin}" "graduate student" "${field1}" "${gradYrStr}"`,
       ...(field2 ? [`site:linkedin.com/in/ "MS" "${field2}" "${origin}" "${visaKw}" OR "seeking"`] : []),
+      ...extraFields.map(f => `site:linkedin.com/in/ "MS" "${f}" "${origin}" "${visaKw}" OR "seeking"`),
       // Day 1 CPT school dorks
       `site:linkedin.com/in/ "Harrisburg University" OR "Cumberlands" "${field1}" "${origin}"`,
       `site:linkedin.com/in/ "Day 1 CPT" "${field1}" "${origin}" "seeking"`,
@@ -224,6 +228,7 @@ export function buildQueryExamples(params: any, sequence: string[]): string {
       ] : []),
       `subreddit:cscareerquestions "TCS" OR "Infosys" OR "Wipro" "product company" "${field1}" ${origin}`,
       ...(field2 ? [`subreddit:f1visa OR subreddit:cscareerquestions "${field2}" OPT struggling ${origin}`] : []),
+      ...extraFields.map(f => `subreddit:f1visa OR subreddit:cscareerquestions "${f}" OPT struggling ${origin}`),
     ],
   };
 
@@ -259,7 +264,7 @@ export function buildAgentPrompt(params: any): string {
 
   // Target cities hint for github queries
   const cityHint = params.targetCities && !/all/i.test(params.targetCities)
-    ? params.targetCities.split(/[,\/]/).map((c: string) => c.trim().split(' ')[0]).filter(Boolean).join(' OR ')
+    ? params.targetCities.split(/[,\/]/).map((c: string) => c.trim()).filter(Boolean).join(' OR ')
     : null;
 
   return `You are a Lead Discovery Agent for CareerXcelerator. Find ${target} qualified leads matching the target profile below.

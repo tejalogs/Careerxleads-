@@ -8,6 +8,7 @@ import { mockScore, qualifyProfiles } from '@/lib/leads/qualification';
 import { formatRejectionFeedback } from '@/lib/leads/rejection';
 import { buildAgentPrompt } from '@/lib/leads/queries';
 import { isEliteUni, SENIOR_TITLES, LOW_FIELDS } from '@/lib/leads/patterns';
+import { requireAuth } from '@/lib/auth';
 
 export const maxDuration = 60; // Vercel Hobby max (300 on Pro)
 
@@ -43,9 +44,26 @@ const TOOLS: Anthropic.Tool[] = [
 ];
 
 // ── Track in-progress runs to prevent double-submit ───────────────────────────
-const activeRuns = new Set<string>();
+// Uses Map with timestamps to auto-expire stale entries (e.g. crashed runs)
+const STALE_RUN_MS = 10 * 60 * 1000; // 10 minutes
+const activeRuns = new Map<string, number>();
+
+function acquireRun(key: string): boolean {
+  const now = Date.now();
+  const existing = activeRuns.get(key);
+  if (existing && (now - existing) < STALE_RUN_MS) return false;
+  activeRuns.set(key, now);
+  return true;
+}
+
+function releaseRun(key: string): void {
+  activeRuns.delete(key);
+}
 
 export async function POST(req: Request) {
+  const authError = requireAuth(req);
+  if (authError) return authError;
+
   let body: any;
   try { body = await req.json(); } catch {
     return new Response(JSON.stringify({ error: 'Invalid JSON body' }), { status: 400, headers: { 'Content-Type': 'application/json' } });
@@ -62,7 +80,7 @@ export async function POST(req: Request) {
   }
 
   const runKey = `${params.audience}|${leadCount}`;
-  if (activeRuns.has(runKey)) {
+  if (!acquireRun(runKey)) {
     return new Response(JSON.stringify({ error: 'A run with these parameters is already in progress' }), { status: 429, headers: { 'Content-Type': 'application/json' } });
   }
 
@@ -74,7 +92,7 @@ export async function POST(req: Request) {
     writer.write(encoder.encode(`data: ${JSON.stringify({ event, data })}\n\n`)).catch(() => {});
   };
 
-  activeRuns.add(runKey);
+  // Run already acquired above via acquireRun()
   (async () => {
     try {
       // ── No API key — return mock data directly ────────────────────────────
@@ -269,7 +287,7 @@ export async function POST(req: Request) {
     } catch (err: any) {
       send('error', { message: err.message || 'Agent failed unexpectedly' });
     } finally {
-      activeRuns.delete(runKey);
+      releaseRun(runKey);
       writer.close().catch(() => {});
     }
   })();

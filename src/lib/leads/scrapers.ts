@@ -94,9 +94,13 @@ export function normalizeLinkedIn(item: any, idx: number, actor: string): any {
 // Priority: explicit international +CC prefix → formatted local number
 export function extractPhone(text: string): string | null {
   if (!text) return null;
-  // Any +[country-code] number — covers all countries
-  const intl = text.match(/(?<!\d)(\+\d{1,3}[\s.\-]?\(?\d{1,4}\)?[\s.\-]\d{2,5}[\s.\-]\d{3,5}(?:[\s.\-]\d{2,4})?)(?!\d)/);
-  if (intl) return intl[1].trim();
+  // International format: +CC (1-3 digits) followed by 7-15 digit phone number
+  // Requires country code 1-3 digits, then structured digit groups totaling 7+ digits
+  const intl = text.match(/(?<!\d)(\+(?:1|[2-9]\d|[2-9]\d{2})[\s.\-]?\(?\d{2,4}\)?[\s.\-]\d{2,5}[\s.\-]\d{3,5}(?:[\s.\-]\d{2,4})?)(?!\d)/);
+  if (intl) {
+    const digits = intl[1].replace(/\D/g, '');
+    if (digits.length >= 8 && digits.length <= 16) return intl[1].trim();
+  }
   // Formatted local number without country prefix: (XXX) XXX-XXXX | XXX-XXX-XXXX | XXX.XXX.XXXX
   const local = text.match(/(?<!\d)\(?\d{3}\)?[\s.\-]\d{3}[\s.\-]\d{4}(?!\d)/);
   if (local) return local[0].trim();
@@ -137,7 +141,7 @@ export function normalizeGoogle(item: any, idx: number, actor: string): any {
   const title = item.title || '';
   const name  = url.includes('linkedin.com/in/') ? title.replace(/\s*[-|].*$/i, '').trim() : (title || 'Unknown');
   const edu   = extractEdu(`${title} ${snip}`);
-  const isPdf = url.toLowerCase().endsWith('.pdf') || /filetype:pdf/i.test(url);
+  const isPdf = url.toLowerCase().endsWith('.pdf');
   // Extract contact info from snippet — PDF resume headers are often shown in snippet
   const email = extractEmailFromText(snip);
   const phone = extractPhone(`${snip} ${title}`);

@@ -6,6 +6,7 @@ import LeadTable from '@/components/LeadTable';
 import ErrorBoundary from '@/components/ErrorBoundary';
 import { GenerationParams, Lead, PipelineStats, RejectedLead, SearchHistoryEntry } from '@/types';
 import { FiLoader, FiCheckCircle, FiAlertTriangle, FiRefreshCw, FiClock, FiZap, FiGlobe, FiFilter } from 'react-icons/fi';
+import { apiFetch } from '@/lib/api-client';
 import styles from './page.module.css';
 
 const SESSION_KEY = 'careerx_session';
@@ -20,6 +21,7 @@ export default function Home() {
   const [isExporting, setIsExporting]   = useState(false);
   const [exportMessage, setExportMessage] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState('');
+  const exportTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [mockWarning, setMockWarning]   = useState<string | null>(null);
   const [stats, setStats]               = useState<PipelineStats | null>(null);
   const [searchHistory, setSearchHistory] = useState<SearchHistoryEntry[]>([]);
@@ -68,7 +70,10 @@ export default function Home() {
   const stopTimer = () => {
     if (timerRef.current) { clearInterval(timerRef.current); timerRef.current = null; }
   };
-  useEffect(() => () => stopTimer(), []);
+  useEffect(() => () => {
+    stopTimer();
+    if (exportTimerRef.current) clearTimeout(exportTimerRef.current);
+  }, []);
 
   const fmtElapsed = (s: number) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
 
@@ -86,100 +91,126 @@ export default function Home() {
     const addLog = (msg: string) => setAgentLog(prev => [...prev.slice(-19), msg]);
 
     try {
-      const res = await fetch('/api/run-agent', {
+      const res = await apiFetch('/api/run-agent', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ params }),
       });
 
+      if (!res.ok) {
+        const errBody = await res.text().catch(() => '');
+        throw new Error(`Server error ${res.status}: ${errBody || res.statusText}`);
+      }
       if (!res.body) throw new Error('No response body from agent');
 
       const reader  = res.body.getReader();
       const decoder = new TextDecoder();
       let   buffer  = '';
 
+      // Timeout: abort if no data received for 2 minutes
+      let lastDataAt = Date.now();
+      const SSE_TIMEOUT_MS = 120_000;
+
       while (true) {
         const { done, value } = await reader.read();
         if (done) break;
 
+        lastDataAt = Date.now();
         buffer += decoder.decode(value, { stream: true });
         const lines = buffer.split('\n');
         buffer = lines.pop() || '';
 
         for (const line of lines) {
           if (!line.startsWith('data: ')) continue;
+          let parsed: { event?: string; data?: Record<string, unknown> };
           try {
-            const { event, data } = JSON.parse(line.slice(6));
+            parsed = JSON.parse(line.slice(6));
+          } catch {
+            continue; // skip malformed SSE lines
+          }
+          const { event, data } = parsed;
+          if (!event || !data) continue;
 
-            if (event === 'progress') {
-              addLog(data.message);
-            } else if (event === 'tool_start') {
-              setActivePlatform(data.platform);
-              addLog(`Searching ${data.platform}…`);
-            } else if (event === 'tool_done') {
-              addLog(`${data.platform}: ${data.qualifiedNew} new leads (total ${data.totalQualified})`);
-            } else if (event === 'cost_estimate') {
-              addLog(`Tokens: ${data.inputTokens.toLocaleString()} in / ${data.outputTokens.toLocaleString()} out · ~$${data.estimatedCostUsd} est.`);
-            } else if (event === 'complete') {
-              stopTimer();
-              const finalLeads: Lead[] = data.leads || [];
-              const pipelineStats: PipelineStats = data.stats || { scraped: finalLeads.length, qualified: finalLeads.length, rejected: 0 };
-              setLeads(finalLeads);
-              setRejectedLeads(data.rejectedLeads || []);
-              setStats(pipelineStats);
-              if (data.isMock) setMockWarning(data.mockReason || 'Demo data shown');
+          if (event === 'progress') {
+            addLog(String(data.message ?? ''));
+          } else if (event === 'tool_start') {
+            setActivePlatform(String(data.platform ?? ''));
+            addLog(`Searching ${data.platform}…`);
+          } else if (event === 'tool_done') {
+            addLog(`${data.platform}: ${data.qualifiedNew} new leads (total ${data.totalQualified})`);
+          } else if (event === 'cost_estimate') {
+            addLog(`Tokens: ${Number(data.inputTokens ?? 0).toLocaleString()} in / ${Number(data.outputTokens ?? 0).toLocaleString()} out · ~$${data.estimatedCostUsd} est.`);
+          } else if (event === 'complete') {
+            stopTimer();
+            const rawLeads = Array.isArray(data.leads) ? data.leads as Lead[] : [];
+            // Deduplicate by id to prevent React duplicate-key warnings
+            const seenIds = new Set<string>();
+            const finalLeads = rawLeads.filter(l => {
+              if (!l || typeof l.id !== 'string') return false;
+              if (seenIds.has(l.id)) return false;
+              seenIds.add(l.id);
+              return true;
+            });
+            const pipelineStats: PipelineStats = (data.stats as PipelineStats) || { scraped: finalLeads.length, qualified: finalLeads.length, rejected: 0 };
+            setLeads(finalLeads);
+            setRejectedLeads(Array.isArray(data.rejectedLeads) ? data.rejectedLeads as RejectedLead[] : []);
+            setStats(pipelineStats);
+            if (data.isMock) setMockWarning(String(data.mockReason ?? 'Demo data shown'));
 
-              const entry: SearchHistoryEntry = {
-                id: Date.now().toString(),
-                timestamp: new Date().toISOString(),
-                params,
-                qualifiedCount: pipelineStats.qualified,
-              };
-              setSearchHistory(prev => {
-                const updated = [entry, ...prev].slice(0, 5);
-                try { localStorage.setItem(HISTORY_KEY, JSON.stringify(updated)); } catch { /* ignore */ }
-                return updated;
-              });
+            const entry: SearchHistoryEntry = {
+              id: Date.now().toString(),
+              timestamp: new Date().toISOString(),
+              params,
+              qualifiedCount: pipelineStats.qualified,
+            };
+            setSearchHistory(prev => {
+              const updated = [entry, ...prev].slice(0, 5);
+              try { localStorage.setItem(HISTORY_KEY, JSON.stringify(updated)); } catch { /* ignore */ }
+              return updated;
+            });
 
-              setPhase('results');
-            } else if (event === 'error') {
-              throw new Error(data.message || 'Agent error');
-            }
-          } catch (parseErr: any) {
-            // Re-throw real errors (from event === 'error' handler), ignore JSON parse noise
-            if (parseErr instanceof Error) throw parseErr;
+            setPhase('results');
+          } else if (event === 'error') {
+            throw new Error(String(data.message ?? 'Agent error'));
           }
         }
+
+        // Check for stale connection
+        if (Date.now() - lastDataAt > SSE_TIMEOUT_MS) {
+          throw new Error('Connection timed out — no data received for 2 minutes.');
+        }
       }
-    } catch (error: any) {
+    } catch (err: unknown) {
       stopTimer();
-      setErrorMessage(error.message || 'An unexpected error occurred.');
+      const message = err instanceof Error ? err.message : 'An unexpected error occurred.';
+      setErrorMessage(message);
       setPhase('error');
     }
   };
 
   // ── Handlers ──────────────────────────────────────────────────────────────
   const handleStatusChange = (leadId: string, status: Lead['status']) => {
-    setLeads(prev => prev.map(l => l.id === leadId ? { ...l, status } : l));
-    if (status === 'contacted') {
-      const lead = leads.find(l => l.id === leadId);
-      if (lead) {
-        fetch('/api/export-sheets', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ leads: [{ ...lead, status }] }),
-        }).catch(e => console.error('Auto-sheet push failed:', e));
+    setLeads(prev => {
+      const updated = prev.map(l => l.id === leadId ? { ...l, status } : l);
+      // Auto-push to sheet when contacted — use updated list to avoid stale closure
+      if (status === 'contacted') {
+        const lead = updated.find(l => l.id === leadId);
+        if (lead) {
+          apiFetch('/api/export-sheets', {
+            method: 'POST',
+            body: JSON.stringify({ leads: [lead] }),
+          }).catch(e => console.error('Auto-sheet push failed:', e));
+        }
       }
-    }
+      return updated;
+    });
   };
 
   const handleExportSheets = async (filteredLeads: Lead[]) => {
     setIsExporting(true);
     setExportMessage(null);
     try {
-      const res = await fetch('/api/export-sheets', {
+      const res = await apiFetch('/api/export-sheets', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ leads: filteredLeads, rejectedLeads }),
       });
       const data = await res.json();
@@ -194,14 +225,17 @@ export default function Home() {
           msg = `Exported ${data.exportedCount} leads to Google Sheets${rejNote}`;
         }
         setExportMessage(msg);
-        setTimeout(() => setExportMessage(null), 4000);
+        if (exportTimerRef.current) clearTimeout(exportTimerRef.current);
+        exportTimerRef.current = setTimeout(() => setExportMessage(null), 4000);
       } else {
         throw new Error(data.error || 'Export failed');
       }
-    } catch (error: any) {
-      console.error('Export error:', error);
-      setExportMessage(`Export failed: ${error.message}`);
-      setTimeout(() => setExportMessage(null), 5000);
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Export failed';
+      console.error('Export error:', err);
+      setExportMessage(`Export failed: ${message}`);
+      if (exportTimerRef.current) clearTimeout(exportTimerRef.current);
+      exportTimerRef.current = setTimeout(() => setExportMessage(null), 5000);
     } finally {
       setIsExporting(false);
     }
@@ -210,9 +244,8 @@ export default function Home() {
   const handleLeadFeedback = async (lead: Lead, feedback: Lead['feedback']) => {
     setLeads(prev => prev.map(l => l.id === lead.id ? { ...l, feedback } : l));
     try {
-      await fetch('/api/lead-feedback', {
+      await apiFetch('/api/lead-feedback', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ leadId: lead.id, linkedinUrl: lead.linkedinUrl, feedback, name: lead.name }),
       });
     } catch (e) { console.error('Failed to send feedback:', e); }

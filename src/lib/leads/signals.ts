@@ -1,11 +1,11 @@
 import {
-  INDIAN_SURNAME_RE, INDIAN_UNI_RE, ISA_ORG_RE, DESI_LANGUAGE_RE, INDIA_PREP_RE,
   CPT_UNI_RE, BODY_SHOP_RE, COMMENT_INTENT_RE, FINANCIAL_CLOCK_RE,
   RESUME_REVIEW_RE, LINKEDIN_PREMIUM_RE, PRODUCT_COMPANY_RE,
   LOW_FIELDS, isEliteUni, categorizeUniversity,
 } from './patterns';
 import { getGradDateEstimate, isH1BSeasonNow, isH1BResultsWindow } from './timing';
 import { detectRegionalTag } from './regional';
+import { checkIndianOrigin } from './origin';
 
 // ── SignalSet — single extraction pass per profile ────────────────────────────
 export interface SignalSet {
@@ -64,27 +64,16 @@ export function extractSignals(p: any): SignalSet {
   const undergradDeg = (undergradEdu.degreeName || '').toLowerCase();
   const undergradUniStr = (undergradEdu.schoolName || '').toLowerCase();
 
-  const orgs = (p.organizations || p.volunteerExperiences || [])
-    .map((o: any) => (o.organizationName || o.name || '').toLowerCase()).join(' ');
-  const languages = (p.languages || [])
-    .map((l: any) => (l.name || l || '').toLowerCase()).join(' ');
-  const combinedText = `${headline} ${summary} ${languages} ${orgs}`;
-
-  // ── Origin signals ─────────────────────────────────────────────────────────
-  const surnamMatch = INDIAN_SURNAME_RE.test(fullName);
-  const btechSignal = /b\.?tech|b\.?e\b|bachelor of (engineering|technology)|b\.?sc engg/i.test(undergradDeg)
-    && INDIAN_UNI_RE.test(undergradUniStr);
-  const isaSignal = ISA_ORG_RE.test(orgs) || ISA_ORG_RE.test(combinedText);
-  const langSignal = DESI_LANGUAGE_RE.test(languages) || DESI_LANGUAGE_RE.test(summary);
-  const prepSignal = INDIA_PREP_RE.test(combinedText);
-  const indianOriginConfirmed = surnamMatch || btechSignal || isaSignal || langSignal || prepSignal;
+  // ── Origin signals (unified 5-signal check) ──────────────────────────────
+  const indianOriginConfirmed = checkIndianOrigin(p);
 
   // ── Degree ─────────────────────────────────────────────────────────────────
   const mastersStudent = /master|ms\b|m\.s\.|mba|m\.b\.a\.|meng|m\.eng|m\.sc/i.test(degree)
     || /\bms\b|m\.s\.|master|mba|meng|m\.eng|m\.sc/i.test(headline);
 
   // ── Intent signals ─────────────────────────────────────────────────────────
-  const visaStruggle = /\bopt\b|f1\b|cpt\b|ead\b|visa sponsorship|no sponsorship needed|stem opt|stem extension|h1b sponsorship|h1b not selected|work authorization/i.test(headline);
+  const visaStruggle = /\bopt\b|f1\b|cpt\b|ead\b|visa sponsorship|stem opt|stem extension|h1b sponsorship|h1b not selected|work authorization/i.test(headline)
+    && !/no sponsorship needed|does not require sponsorship|authorized to work/i.test(headline);
   const h1bPanic = isH1BSeasonNow() && /h1b|lottery|not selected|day 1 cpt|day1 cpt|opt extension/i.test(headline);
   const h1bResultsPanic = isH1BResultsWindow() && /h1b|lottery|not selected|opt extension|day 1 cpt|day1 cpt/i.test(headline);
   const cptSchool = CPT_UNI_RE.test(university);
@@ -134,14 +123,19 @@ export function extractSignals(p: any): SignalSet {
   const regionalTag = detectRegionalTag(p);
   const undergradSchoolFull = undergradEdu?.schoolName || null;
   const undergradSchool = undergradSchoolFull
-    ? undergradSchoolFull.split(' ').slice(0, 4).join(' ')
+    ? (undergradSchoolFull.length > 40 ? undergradSchoolFull.slice(0, 38) + '…' : undergradSchoolFull)
     : null;
 
   // ── OPT countdown ──────────────────────────────────────────────────────────
+  // OPT unemployment clock: F1 students can be unemployed for max 90 consecutive days.
+  // OPT validity: 12 months (365d) standard, 36 months (1095d) with STEM extension.
+  // We approximate by tracking days since estimated graduation.
+  const OPT_UNEMPLOYMENT_LIMIT = 90;
+  const OPT_STANDARD_VALIDITY = 365;
   const gradDateEst = gradYrNum > 0 ? getGradDateEstimate(gradYrNum, p.headline || '') : null;
   const daysAgo = gradDateEst ? Math.floor((Date.now() - gradDateEst.getTime()) / 86_400_000) : -1;
-  const optDaysRemaining = (daysAgo >= 60 && daysAgo <= 90 && jobSearchIntent)
-    ? Math.max(0, 90 - daysAgo) : undefined;
+  const optDaysRemaining = (daysAgo >= 0 && daysAgo <= OPT_STANDARD_VALIDITY && jobSearchIntent)
+    ? Math.max(0, OPT_UNEMPLOYMENT_LIMIT - daysAgo) : undefined;
 
   // ── Profile meta ───────────────────────────────────────────────────────────
   const relevantField = !LOW_FIELDS.some(f => fieldOfStudy.toLowerCase().includes(f));
